@@ -11,12 +11,12 @@ import { Colors } from "../../constants/Colors";
 const BASE_URL = "https://durianapp-production.up.railway.app";
 
 const LABEL_VI: Record<string, string> = {
-  Leaf_Algal:          "Đốm tảo",
-  Leaf_Blight:         "Cháy lá",
-  Leaf_Colletotrichum: "Colletotrichum",
+  Leaf_Algal:          "Đốm tảo (tảo ký sinh)",
+  Leaf_Blight:         "Cháy lá (Phytophthora)",
+  Leaf_Colletotrichum: "Thán thư (đốm nâu)",
   Leaf_Healthy:        "Khỏe mạnh",
-  Leaf_Phomopsis:      "Phomopsis",
-  Leaf_Rhizoctonia:    "Rhizoctonia",
+  Leaf_Phomopsis:      "Khô đầu lá (Phomopsis)",
+  Leaf_Rhizoctonia:    "Lở cổ rễ / đốm lá (Rhizoctonia)",
 };
 
 export default function HistoryScreen() {
@@ -70,7 +70,7 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: any }) => {
     const cls    = item.predicted_class ?? "Unknown";
-    const nameVi = LABEL_VI[cls] ?? cls;
+    const nameVi = item.disease?.name_vi || LABEL_VI[cls] || cls;
     const conf   = ((item.confidence ?? 0) * 100).toFixed(1);
     const badge  = Colors.diseaseBadge[cls as keyof typeof Colors.diseaseBadge]
                 ?? { bg: "#f5f5f5", text: "#555" };

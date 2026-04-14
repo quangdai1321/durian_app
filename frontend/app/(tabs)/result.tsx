@@ -15,12 +15,12 @@ const IS_WEB    = Platform.OS === "web";
 const HERO_H_WEB = 260;
 
 const LABEL_VI: Record<string, string> = {
-  Leaf_Algal:          "Bệnh đốm tảo",
-  Leaf_Blight:         "Bệnh cháy lá",
-  Leaf_Colletotrichum: "Bệnh đốm Colletotrichum",
+  Leaf_Algal:          "Bệnh đốm tảo (tảo ký sinh)",
+  Leaf_Blight:         "Bệnh cháy lá (Phytophthora)",
+  Leaf_Colletotrichum: "Bệnh thán thư (đốm nâu)",
   Leaf_Healthy:        "Lá khỏe mạnh",
-  Leaf_Phomopsis:      "Bệnh Phomopsis",
-  Leaf_Rhizoctonia:    "Bệnh Rhizoctonia",
+  Leaf_Phomopsis:      "Bệnh khô đầu lá (Phomopsis)",
+  Leaf_Rhizoctonia:    "Bệnh lở cổ rễ / đốm lá (Rhizoctonia)",
 };
 
 const DISEASE_ICON: Record<string, string> = {
@@ -100,7 +100,7 @@ export default function ResultScreen() {
   const cls     = diagnosis.predicted_class ?? "Unknown";
   const conf    = (diagnosis.confidence ?? 0) * 100;
   const confStr = conf.toFixed(1);
-  const nameVi  = LABEL_VI[cls] ?? cls;
+  const nameVi  = diagnosis.disease?.name_vi || LABEL_VI[cls] || cls;
   const icon    = DISEASE_ICON[cls] ?? "🍃";
   const badge   = Colors.diseaseBadge[cls as keyof typeof Colors.diseaseBadge]
                 ?? { bg: "#f0f0f0", text: "#555" };
