@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
-from .database import engine, Base
+from .database import engine, Base, AsyncSessionLocal
 from .routers import auth, diagnoses, diseases, news, ai
 from .config import settings
 
@@ -41,7 +41,12 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         await _migrate_add_columns(conn)
 
-    # 2. Tạo thư mục upload
+    # 2. Seed dữ liệu bệnh nếu DB mới (Railway PostgreSQL)
+    from .seed import seed_disease_classes
+    async with AsyncSessionLocal() as db:
+        await seed_disease_classes(db)
+
+    # 3. Tạo thư mục upload
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
     # 3. Load AI model vào RAM ngay lúc server start
