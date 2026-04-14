@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "http://localhost:8000/api"; // Change to your server IP
+const BASE_URL = "https://durianapp-production.up.railway.app/api";
 
 async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem("access_token");
