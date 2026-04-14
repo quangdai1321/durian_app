@@ -80,6 +80,7 @@ class PredictionResult(BaseModel):
 class DiagnosisOut(BaseModel):
     id:               UUID
     image_url:        Optional[str]
+    image_data:       Optional[str] = None   # base64 data URI — dùng khi image_url 404
     model_version:    str
     predicted_class:  Optional[str]
     confidence:       float

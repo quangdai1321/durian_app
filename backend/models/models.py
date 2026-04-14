@@ -62,6 +62,7 @@ class Diagnosis(Base):
     user_id          = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     image_path       = Column(String(500), nullable=False)
     image_url        = Column(String(500))
+    image_data       = Column(Text)          # base64 JPEG — persistent khi Railway restart
     model_version    = Column(String(50), default="YOLOv26n-CLS")
     predicted_class  = Column(String(50), ForeignKey("disease_classes.code"))
     confidence       = Column(Numeric(5, 4), nullable=False)

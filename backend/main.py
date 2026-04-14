@@ -26,6 +26,8 @@ async def _migrate_add_columns(conn):
     migrations = [
         # Thêm cột yield_stats vào bảng users nếu chưa có (PostgreSQL syntax)
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS yield_stats TEXT",
+        # Thêm cột image_data vào diagnoses để lưu ảnh base64 persistent
+        "ALTER TABLE diagnoses ADD COLUMN IF NOT EXISTS image_data TEXT",
     ]
     for sql in migrations:
         try:

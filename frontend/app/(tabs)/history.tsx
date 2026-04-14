@@ -81,7 +81,7 @@ export default function HistoryScreen() {
     return (
       <TouchableOpacity style={styles.item} onPress={() => openDiagnosis(item)}>
         {item.image_url ? (
-          <Image source={{ uri: `${BASE_URL}${item.image_url}` }} style={styles.thumb} />
+          <Image source={{ uri: item.image_data || `${BASE_URL}${item.image_url}` }} style={styles.thumb} />
         ) : (
           <View style={[styles.thumb, { backgroundColor: badge.bg, justifyContent: "center", alignItems: "center" }]}>
             <Text style={{ fontSize: 24 }}>🌿</Text>

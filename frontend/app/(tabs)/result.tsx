@@ -120,7 +120,7 @@ export default function ResultScreen() {
         {(!IS_WEB || !diagnosis.image_url) && (
           diagnosis.image_url ? (
             <Image
-              source={{ uri: `${BASE_URL}${diagnosis.image_url}` }}
+              source={{ uri: diagnosis.image_data || `${BASE_URL}${diagnosis.image_url}` }}
               style={styles.heroImg}
               resizeMode="cover"
             />
@@ -165,7 +165,7 @@ export default function ResultScreen() {
           {IS_WEB && diagnosis.image_url && (
             <View style={styles.webImgCard}>
               <Image
-                source={{ uri: `${BASE_URL}${diagnosis.image_url}` }}
+                source={{ uri: diagnosis.image_data || `${BASE_URL}${diagnosis.image_url}` }}
                 style={styles.webImg}
                 resizeMode="contain"
               />

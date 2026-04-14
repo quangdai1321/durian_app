@@ -64,6 +64,10 @@ async def create_diagnosis(
     async with aiofiles.open(image_path, "wb") as f:
         await f.write(content)
 
+    # Lưu base64 để hiển thị ảnh khi filesystem bị xóa (Railway ephemeral)
+    import base64
+    image_data_b64 = "data:image/jpeg;base64," + base64.b64encode(content).decode()
+
     # ── Bước 1: Kiểm tra ảnh có phải lá sầu riêng không (GPT-4o vision) ──
     is_leaf, leaf_answer = await check_is_durian_leaf(str(image_path))
     if not is_leaf:
@@ -94,6 +98,7 @@ async def create_diagnosis(
         user_id=current_user.id if current_user else None,
         image_path=str(image_path),
         image_url=f"/uploads/{filename}",
+        image_data=image_data_b64,
         model_version=prediction["model_version"],
         predicted_class=prediction["predicted_class"],
         confidence=prediction["confidence"],
