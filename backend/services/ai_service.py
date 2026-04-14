@@ -199,9 +199,14 @@ def load_model_on_startup():
 
         except Exception as e:
             print(f"[AI] ERROR: Load model that bai: {e}")
+            print(f"[AI] WARNING: Chay MOCK MODE do loi load model")
+            _model         = None
+            _model_version = "Mock Mode"
+            _model_loaded  = True
+            return
 
     # ── Trường hợp 2: Không có file .pt → MOCK MODE ─────────
-    print(f"[AI] WARNING: Khong tim thay model tai: {model_path}")
+    print(f"[AI] WARNING: Khong tim thay file model tai: {model_path.resolve()}")
     print(f"[AI] WARNING: Chay MOCK MODE - ket qua ngau nhien (chi dung de test UI)")
     _model         = None
     _model_version = "Mock Mode"
