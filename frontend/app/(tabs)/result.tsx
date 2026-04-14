@@ -144,12 +144,14 @@ export default function ResultScreen() {
           </View>
         </View>
 
-        {/* Floating icon badge */}
-        <View style={styles.heroIconRing}>
-          <View style={[styles.heroIconInner, { backgroundColor: badge.bg }]}>
-            <Text style={{ fontSize: 28 }}>{icon}</Text>
+        {/* Floating icon badge — chỉ hiện trên mobile */}
+        {!IS_WEB && (
+          <View style={styles.heroIconRing}>
+            <View style={[styles.heroIconInner, { backgroundColor: badge.bg }]}>
+              <Text style={{ fontSize: 28 }}>{icon}</Text>
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
       <ScrollView
@@ -384,7 +386,7 @@ const styles = StyleSheet.create({
 
   // Hero
   heroWrap: { width: "100%", height: HERO_H, position: "relative" },
-  heroWrapWebNoImg: { height: 64, backgroundColor: Colors.primary },
+  heroWrapWebNoImg: { height: 56, backgroundColor: Colors.primary },
   heroImg:  { width: "100%", height: HERO_H, position: "absolute" },
   webImgCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
   webImg: { width: "100%", height: 320 },
@@ -395,7 +397,7 @@ const styles = StyleSheet.create({
   },
   heroNav: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingTop: Platform.OS === "ios" ? 56 : 36, paddingHorizontal: 18,
+    paddingTop: IS_WEB ? 10 : (Platform.OS === "ios" ? 56 : 36), paddingHorizontal: 18,
   },
   backBtn: {
     backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20,
