@@ -88,6 +88,11 @@ export default function CameraScreen() {
         }
       } catch {}
       const result: any = await diagnosisApi.diagnose(uri, { latitude: lat, longitude: lng });
+      // Nếu backend không trả về image_data (DB chưa có cột / record cũ),
+      // dùng URI local của camera làm fallback để result screen luôn có ảnh
+      if (!result.image_data) {
+        result.image_data = uri;
+      }
       await AsyncStorage.setItem("last_diagnosis", JSON.stringify(result));
       // Append to local history for guest users
       const raw = await AsyncStorage.getItem("local_history");
