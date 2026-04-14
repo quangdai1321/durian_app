@@ -54,7 +54,7 @@ async def create_diagnosis(
         from PIL import Image as PILImage
         import io
         pil_img = PILImage.open(io.BytesIO(content)).convert("RGB")
-        pil_img.thumbnail((800, 800), PILImage.LANCZOS)  # max 800×800, giữ tỉ lệ
+        pil_img.thumbnail((512, 512), PILImage.LANCZOS)  # max 512×512 — tối ưu cho OpenAI low + YOLO 224
         buf = io.BytesIO()
         pil_img.save(buf, format="JPEG", quality=85)
         content = buf.getvalue()

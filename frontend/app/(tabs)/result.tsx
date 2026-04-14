@@ -114,22 +114,25 @@ export default function ResultScreen() {
 
   return (
     <View style={styles.root}>
-      {/* ── Hero header ── */}
-      <View style={styles.heroWrap}>
-        {diagnosis.image_url ? (
-          <Image
-            source={{ uri: `${BASE_URL}${diagnosis.image_url}` }}
-            style={styles.heroImg}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.heroImg, styles.heroPlaceholder]}>
-            <Text style={{ fontSize: 80 }}>🌿</Text>
-          </View>
+      {/* ── Hero header — trên web ẩn ảnh nền nếu đã có ảnh card bên dưới ── */}
+      <View style={[styles.heroWrap, IS_WEB && diagnosis.image_url && styles.heroWrapWebNoImg]}>
+        {/* Ảnh nền: chỉ hiện trên mobile, hoặc khi không có image_url */}
+        {(!IS_WEB || !diagnosis.image_url) && (
+          diagnosis.image_url ? (
+            <Image
+              source={{ uri: `${BASE_URL}${diagnosis.image_url}` }}
+              style={styles.heroImg}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.heroImg, styles.heroPlaceholder]}>
+              <Text style={{ fontSize: 80 }}>🌿</Text>
+            </View>
+          )
         )}
 
-        {/* Dark gradient overlay */}
-        <View style={styles.heroOverlay} />
+        {/* Dark gradient overlay — chỉ khi có ảnh nền */}
+        {(!IS_WEB || !diagnosis.image_url) && <View style={styles.heroOverlay} />}
 
         {/* Nav row */}
         <View style={styles.heroNav}>
@@ -381,6 +384,7 @@ const styles = StyleSheet.create({
 
   // Hero
   heroWrap: { width: "100%", height: HERO_H, position: "relative" },
+  heroWrapWebNoImg: { height: 64, backgroundColor: Colors.primary },
   heroImg:  { width: "100%", height: HERO_H, position: "absolute" },
   webImgCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
   webImg: { width: "100%", height: 320 },
