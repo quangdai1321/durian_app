@@ -24,15 +24,16 @@ class Token(BaseModel):
     user:         UserOut
 
 class UserOut(BaseModel):
-    id:         UUID
-    username:   str
-    email:      str
-    full_name:  Optional[str]
-    phone:      Optional[str]
-    role:       str
-    province:   Optional[str]
-    avatar_url: Optional[str]
-    created_at: datetime
+    id:          UUID
+    username:    str
+    email:       str
+    full_name:   Optional[str]
+    phone:       Optional[str]
+    role:        str
+    province:    Optional[str]
+    avatar_url:  Optional[str]
+    avatar_data: Optional[str] = None   # base64 data URI — dùng khi avatar_url 404
+    created_at:  datetime
     model_config = {"from_attributes": True}
 
 class UserUpdate(BaseModel):

@@ -109,14 +109,36 @@ async def upload_avatar(
     if len(content) > MAX_AVATAR:
         raise HTTPException(413, "Avatar exceeds 5 MB limit")
 
-    upload_dir = Path(settings.UPLOAD_DIR) / "avatars"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    filename   = f"avatar_{current_user.id}{ext}"
-    save_path  = upload_dir / filename
-    async with aiofiles.open(save_path, "wb") as f:
-        await f.write(content)
+    # Resize avatar về 200×200 để giảm dung lượng base64 lưu DB
+    try:
+        from PIL import Image as PILImage
+        import io
+        pil_img = PILImage.open(io.BytesIO(content)).convert("RGB")
+        pil_img.thumbnail((200, 200), PILImage.LANCZOS)
+        buf = io.BytesIO()
+        pil_img.save(buf, format="JPEG", quality=85)
+        content = buf.getvalue()
+        ext = ".jpg"
+    except Exception:
+        pass  # Nếu lỗi → dùng ảnh gốc
 
-    current_user.avatar_url = f"/uploads/avatars/{filename}"
+    # Lưu base64 vào DB để tránh mất ảnh khi Railway restart
+    import base64
+    avatar_b64 = "data:image/jpeg;base64," + base64.b64encode(content).decode()
+
+    # Vẫn lưu file cho local dev (không ảnh hưởng production)
+    try:
+        upload_dir = Path(settings.UPLOAD_DIR) / "avatars"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        filename   = f"avatar_{current_user.id}{ext}"
+        save_path  = upload_dir / filename
+        async with aiofiles.open(save_path, "wb") as f:
+            await f.write(content)
+        current_user.avatar_url = f"/uploads/avatars/{filename}"
+    except Exception:
+        pass
+
+    current_user.avatar_data = avatar_b64
     db.add(current_user)
     await db.flush()
     await db.refresh(current_user)

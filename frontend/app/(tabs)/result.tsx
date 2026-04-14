@@ -12,7 +12,6 @@ import { Colors } from "../../constants/Colors";
 const BASE_URL  = "https://durianapp-production.up.railway.app";
 const { width } = Dimensions.get("window");
 const IS_WEB    = Platform.OS === "web";
-const HERO_H_WEB = 260;
 
 const LABEL_VI: Record<string, string> = {
   Leaf_Algal:          "Bệnh đốm tảo (tảo ký sinh)",
@@ -39,16 +38,14 @@ export default function ResultScreen() {
   const [rating,    setRating]    = useState(0);
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const barAnim   = useRef(new Animated.Value(0)).current;
 
-  // Re-read mỗi khi tab được focus → luôn hiển thị kết quả mới nhất
   useFocusEffect(useCallback(() => {
     setLoading(true);
     setRating(0);
-    // Reset animations
     fadeAnim.setValue(0);
-    slideAnim.setValue(40);
+    slideAnim.setValue(30);
     barAnim.setValue(0);
 
     AsyncStorage.getItem("last_diagnosis").then(raw => {
@@ -61,9 +58,9 @@ export default function ResultScreen() {
     if (!diagnosis) return;
     const conf = (diagnosis.confidence ?? 0) * 100;
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-      Animated.timing(barAnim,   { toValue: conf / 100, duration: 900, delay: 300, useNativeDriver: false }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+      Animated.timing(barAnim,   { toValue: conf / 100, duration: 800, delay: 200, useNativeDriver: false }),
     ]).start();
   }, [diagnosis]);
 
@@ -97,61 +94,35 @@ export default function ResultScreen() {
     );
   }
 
-  const cls     = diagnosis.predicted_class ?? "Unknown";
-  const conf    = (diagnosis.confidence ?? 0) * 100;
-  const confStr = conf.toFixed(1);
-  const nameVi  = diagnosis.disease?.name_vi || LABEL_VI[cls] || cls;
-  const icon    = DISEASE_ICON[cls] ?? "🍃";
-  const badge   = Colors.diseaseBadge[cls as keyof typeof Colors.diseaseBadge]
-                ?? { bg: "#f0f0f0", text: "#555" };
-  const disease = diagnosis.disease;
+  const cls      = diagnosis.predicted_class ?? "Unknown";
+  const conf     = (diagnosis.confidence ?? 0) * 100;
+  const confStr  = conf.toFixed(1);
+  const nameVi   = diagnosis.disease?.name_vi || LABEL_VI[cls] || cls;
+  const icon     = DISEASE_ICON[cls] ?? "🍃";
+  const badge    = Colors.diseaseBadge[cls as keyof typeof Colors.diseaseBadge]
+                 ?? { bg: "#f0f0f0", text: "#555" };
+  const disease  = diagnosis.disease;
   const isHealthy = cls === "Leaf_Healthy";
-  const isOOD     = diagnosis.is_ood === true;
+  const isOOD    = diagnosis.is_ood === true;
 
   const confColor = conf >= 80 ? "#27ae60"
                   : conf >= 50 ? "#f39c12"
                   : "#e74c3c";
 
+  const imgUri = diagnosis.image_data
+    || (diagnosis.image_url ? `${BASE_URL}${diagnosis.image_url}` : null);
+
   return (
     <View style={styles.root}>
-      {/* ── Hero header — trên web ẩn ảnh nền nếu đã có ảnh card bên dưới ── */}
-      <View style={[styles.heroWrap, IS_WEB && diagnosis.image_url && styles.heroWrapWebNoImg]}>
-        {/* Ảnh nền: chỉ hiện trên mobile, hoặc khi không có image_url */}
-        {(!IS_WEB || !diagnosis.image_url) && (
-          diagnosis.image_url ? (
-            <Image
-              source={{ uri: diagnosis.image_data || `${BASE_URL}${diagnosis.image_url}` }}
-              style={styles.heroImg}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.heroImg, styles.heroPlaceholder]}>
-              <Text style={{ fontSize: 80 }}>🌿</Text>
-            </View>
-          )
-        )}
 
-        {/* Dark gradient overlay — chỉ khi có ảnh nền */}
-        {(!IS_WEB || !diagnosis.image_url) && <View style={styles.heroOverlay} />}
-
-        {/* Nav row */}
-        <View style={styles.heroNav}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/(tabs)/camera")}>
-            <Text style={styles.backBtnText}>←  Chụp lại</Text>
-          </TouchableOpacity>
-          <View style={styles.navTag}>
-            <Text style={styles.navTagText}>KẾT QUẢ</Text>
-          </View>
+      {/* ── Compact nav bar ── */}
+      <View style={styles.navBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/(tabs)/camera")}>
+          <Text style={styles.backBtnText}>←  Chụp lại</Text>
+        </TouchableOpacity>
+        <View style={styles.navTag}>
+          <Text style={styles.navTagText}>KẾT QUẢ</Text>
         </View>
-
-        {/* Floating icon badge — chỉ hiện trên mobile */}
-        {!IS_WEB && (
-          <View style={styles.heroIconRing}>
-            <View style={[styles.heroIconInner, { backgroundColor: badge.bg }]}>
-              <Text style={{ fontSize: 28 }}>{icon}</Text>
-            </View>
-          </View>
-        )}
       </View>
 
       <ScrollView
@@ -161,14 +132,25 @@ export default function ResultScreen() {
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-          {/* ── Web: Image preview card ── */}
-          {IS_WEB && diagnosis.image_url && (
-            <View style={styles.webImgCard}>
+          {/* ── Image preview (inline, no gap) ── */}
+          {imgUri ? (
+            <View style={styles.imgCard}>
               <Image
-                source={{ uri: diagnosis.image_data || `${BASE_URL}${diagnosis.image_url}` }}
-                style={styles.webImg}
-                resizeMode="contain"
+                source={{ uri: imgUri }}
+                style={styles.imgPreview}
+                resizeMode="cover"
               />
+              {/* Icon badge overlaid on bottom-right of image */}
+              <View style={[styles.imgIconBadge, { backgroundColor: badge.bg }]}>
+                <Text style={{ fontSize: 22 }}>{icon}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.imgCard, styles.imgPlaceholder]}>
+              <Text style={{ fontSize: 64 }}>🌿</Text>
+              <View style={[styles.imgIconBadge, { backgroundColor: badge.bg }]}>
+                <Text style={{ fontSize: 22 }}>{icon}</Text>
+              </View>
             </View>
           )}
 
@@ -201,7 +183,6 @@ export default function ResultScreen() {
                     },
                   ]}
                 />
-                {/* Glow cap */}
                 <Animated.View
                   style={[
                     styles.meterGlow,
@@ -366,13 +347,18 @@ function MetaChip({ icon, label, value }: { icon: string; label: string; value: 
   );
 }
 
-const HERO_H = IS_WEB ? HERO_H_WEB : 340;
-
 const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: "#f0f4f0" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, backgroundColor: "#f0f4f0" },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: IS_WEB ? 32 : 16, paddingTop: 16, maxWidth: IS_WEB ? 860 : undefined, alignSelf: IS_WEB ? "center" : undefined, width: IS_WEB ? "100%" : undefined },
+  scrollContent: {
+    paddingHorizontal: IS_WEB ? 32 : 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    maxWidth:   IS_WEB ? 860 : undefined,
+    alignSelf:  IS_WEB ? "center" : undefined,
+    width:      IS_WEB ? "100%" : undefined,
+  },
 
   // Empty state
   emptyTitle:   { fontSize: 20, fontWeight: "800", color: Colors.primary, marginBottom: 6 },
@@ -384,24 +370,20 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
-  // Hero
-  heroWrap: { width: "100%", height: HERO_H, position: "relative" },
-  heroWrapWebNoImg: { height: 56, backgroundColor: Colors.primary },
-  heroImg:  { width: "100%", height: HERO_H, position: "absolute" },
-  webImgCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
-  webImg: { width: "100%", height: 320 },
-  heroPlaceholder: { backgroundColor: "#c8e6c9", justifyContent: "center", alignItems: "center" },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: IS_WEB ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.45)",
-  },
-  heroNav: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingTop: IS_WEB ? 10 : (Platform.OS === "ios" ? 56 : 36), paddingHorizontal: 18,
+  // Nav bar (compact, replaces full-height hero)
+  navBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: Colors.primary,
+    paddingTop:  Platform.OS === "ios" ? 52 : Platform.OS === "android" ? 32 : 12,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
   },
   backBtn: {
     backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20,
-    paddingVertical: 7, paddingHorizontal: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)",
+    paddingVertical: 7, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.35)",
   },
   backBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   navTag: {
@@ -409,36 +391,60 @@ const styles = StyleSheet.create({
     paddingVertical: 5, paddingHorizontal: 12,
   },
   navTagText: { color: "#fff", fontWeight: "800", fontSize: 11, letterSpacing: 1.2 },
-  heroIconRing: {
-    position: "absolute", bottom: -26, alignSelf: "center",
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: "#fff",
-    justifyContent: "center", alignItems: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25, shadowRadius: 10, elevation: 12,
+
+  // Inline image card
+  imgCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 10,
+    backgroundColor: "#c8e6c9",
+    height: IS_WEB ? 300 : 210,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 10, elevation: 6,
   },
-  heroIconInner: {
-    width: 50, height: 50, borderRadius: 25,
-    justifyContent: "center", alignItems: "center",
+  imgPreview: {
+    width: "100%",
+    height: "100%",
+  },
+  imgPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imgIconBadge: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 8,
   },
 
-  // Main card
+  // Main card — no large marginTop needed anymore
   mainCard: {
-    backgroundColor: "#fff", borderRadius: 20, padding: 20,
-    marginTop: 38, marginBottom: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12, shadowRadius: 16, elevation: 10,
+    backgroundColor: "#fff", borderRadius: 20, padding: 18,
+    marginBottom: 10,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1, shadowRadius: 14, elevation: 8,
   },
   classChip: {
     alignSelf: "flex-start", borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 5, marginBottom: 10,
+    paddingHorizontal: 12, paddingVertical: 5, marginBottom: 8,
   },
   classChipText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
-  diseaseName:   { fontSize: 24, fontWeight: "900", marginBottom: 3, lineHeight: 30 },
-  sciName:       { fontSize: 12, color: Colors.textMuted, fontStyle: "italic", marginBottom: 14 },
+  diseaseName:   { fontSize: 22, fontWeight: "900", marginBottom: 3, lineHeight: 28 },
+  sciName:       { fontSize: 12, color: Colors.textMuted, fontStyle: "italic", marginBottom: 12 },
 
   // Confidence meter
-  meterWrap:   { marginTop: 6 },
+  meterWrap:   { marginTop: 4 },
   meterHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   meterLabel:  { fontSize: 12, color: Colors.textMuted, fontWeight: "600" },
   meterValue:  { fontSize: 20, fontWeight: "900" },
@@ -455,23 +461,23 @@ const styles = StyleSheet.create({
   meterTick:  { fontSize: 9, color: "#aaa" },
 
   // Meta chips
-  metaRow:  { flexDirection: "row", gap: 8, marginBottom: 12 },
+  metaRow:  { flexDirection: "row", gap: 8, marginBottom: 10 },
   metaChip: {
-    flex: 1, backgroundColor: "#fff", borderRadius: 16, padding: 12, alignItems: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 5,
+    flex: 1, backgroundColor: "#fff", borderRadius: 16, padding: 10, alignItems: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07, shadowRadius: 6, elevation: 4,
   },
-  metaChipIcon:  { fontSize: 18, marginBottom: 4 },
-  metaChipValue: { fontSize: 13, fontWeight: "800", color: Colors.text, marginBottom: 2 },
+  metaChipIcon:  { fontSize: 16, marginBottom: 3 },
+  metaChipValue: { fontSize: 12, fontWeight: "800", color: Colors.text, marginBottom: 1 },
   metaChipLabel: { fontSize: 9, color: Colors.textMuted, fontWeight: "600", letterSpacing: 0.5 },
 
   // Cards
   card: {
-    backgroundColor: "#fff", borderRadius: 20, padding: 18, marginBottom: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.09, shadowRadius: 14, elevation: 7,
+    backgroundColor: "#fff", borderRadius: 20, padding: 16, marginBottom: 10,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 10, elevation: 5,
   },
-  cardHeader:     { flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  cardHeader:     { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   cardHeaderIcon: { fontSize: 18, marginRight: 8 },
   cardTitle:      { fontSize: 15, fontWeight: "800", color: Colors.primary },
 
@@ -500,10 +506,10 @@ const styles = StyleSheet.create({
     flexDirection: "row", gap: 12,
     backgroundColor: "#fff3e0",
     borderRadius: 16, borderWidth: 1.5, borderColor: "#ff9800",
-    padding: 16, marginBottom: 12,
+    padding: 14, marginBottom: 10,
   },
-  oodIcon:  { fontSize: 28, marginTop: 2 },
-  oodTitle: { fontSize: 14, fontWeight: "800", color: "#e65100", marginBottom: 6 },
+  oodIcon:  { fontSize: 26, marginTop: 2 },
+  oodTitle: { fontSize: 14, fontWeight: "800", color: "#e65100", marginBottom: 5 },
   oodDesc:  { fontSize: 12, color: "#bf360c", lineHeight: 18, marginBottom: 10 },
   oodRetakeBtn: {
     backgroundColor: "#e65100", borderRadius: 10,
@@ -514,17 +520,17 @@ const styles = StyleSheet.create({
   // Alert box
   alertBox: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12,
+    borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 10,
   },
   alertIcon: { fontSize: 20 },
   alertText: { flex: 1, fontSize: 13, fontWeight: "600", lineHeight: 19 },
 
   // Actions
-  actionRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  actionRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   actionBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", gap: 10,
-    borderRadius: 18, padding: 16,
-    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
+    borderRadius: 16, padding: 14,
+    shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 6,
   },
   actionPrimary:      { backgroundColor: Colors.primary, shadowColor: Colors.primary },
   actionPrimaryTitle: { color: "#fff", fontWeight: "800", fontSize: 14 },
@@ -536,15 +542,15 @@ const styles = StyleSheet.create({
 
   // Rating
   ratingCard: {
-    backgroundColor: "#fff", borderRadius: 20, padding: 20, alignItems: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.09, shadowRadius: 14, elevation: 7,
+    backgroundColor: "#fff", borderRadius: 20, padding: 18, alignItems: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 10, elevation: 5,
   },
   ratingTitle:    { fontSize: 15, fontWeight: "800", color: Colors.primary, marginBottom: 4 },
-  ratingSubtitle: { fontSize: 12, color: Colors.textMuted, marginBottom: 14, textAlign: "center" },
+  ratingSubtitle: { fontSize: 12, color: Colors.textMuted, marginBottom: 12, textAlign: "center" },
   starsRow:       { flexDirection: "row", gap: 6 },
   starBtn:        { padding: 4 },
-  star:           { fontSize: 34, color: "#d0d0d0" },
+  star:           { fontSize: 32, color: "#d0d0d0" },
   starActive:     { color: "#f5a623" },
-  ratingThanks:   { marginTop: 12, fontSize: 13, color: Colors.textMuted },
+  ratingThanks:   { marginTop: 10, fontSize: 13, color: Colors.textMuted },
 });

@@ -580,7 +580,7 @@ const ym = StyleSheet.create({
   recNote:    { marginTop: 6, fontSize: 12, color: Colors.textMuted, fontStyle: "italic" },
 });
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://durianapp-production.up.railway.app";
 
 const DISEASE_LABELS: Record<string, string> = {
   Leaf_Algal:          "Tảo lá",
@@ -772,9 +772,9 @@ export default function ProfileScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.avatarWrap} onPress={pickAvatar} activeOpacity={0.8}>
-          {user.avatar_url ? (
+          {(user.avatar_data || user.avatar_url) ? (
             <Image
-              source={{ uri: `${BASE_URL}${user.avatar_url}` }}
+              source={{ uri: user.avatar_data || `${BASE_URL}${user.avatar_url}` }}
               style={s.avatarImg}
             />
           ) : (

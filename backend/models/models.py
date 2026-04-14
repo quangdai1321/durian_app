@@ -21,6 +21,7 @@ class User(Base):
     role          = Column(String(20), default="farmer")
     province      = Column(Unicode(100))
     avatar_url    = Column(Unicode(500))
+    avatar_data   = Column(Text)                 # base64 JPEG — persistent khi Railway restart
     yield_stats   = Column(JSON, default=list)   # list of YieldRecord dicts
     is_active     = Column(Boolean, default=True)
     created_at    = Column(DateTime(timezone=True), default=datetime.utcnow)
