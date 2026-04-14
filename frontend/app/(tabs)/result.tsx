@@ -9,7 +9,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { diagnosisApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
 
-const BASE_URL  = "http://localhost:8000";
+const BASE_URL  = "https://durianapp-production.up.railway.app";
 const { width } = Dimensions.get("window");
 
 const LABEL_VI: Record<string, string> = {
