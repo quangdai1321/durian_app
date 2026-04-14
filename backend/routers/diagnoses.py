@@ -92,13 +92,18 @@ async def create_diagnosis(
     # ── Bước 2: Chạy YOLO inference ──────────────────────────────────────
     prediction = await predict_image(str(image_path))
 
+    # Xoá file tạm sau inference — ảnh đã lưu base64 trong DB, không cần giữ trên disk
+    # (Railway ephemeral filesystem: giải phóng dung lượng ngay sau khi xử lý xong)
+    try: image_path.unlink()
+    except: pass
+
     # Save to DB (guest users: user_id=None, not saved to history)
     user_province = province or (current_user.province if current_user else None)
     diagnosis = Diagnosis(
         user_id=current_user.id if current_user else None,
-        image_path=str(image_path),
+        image_path=str(image_path),   # chỉ lưu path tham chiếu, file đã xoá
         image_url=f"/uploads/{filename}",
-        image_data=image_data_b64,
+        image_data=image_data_b64,    # ← đây là nguồn ảnh chính, persistent trong DB
         model_version=prediction["model_version"],
         predicted_class=prediction["predicted_class"],
         confidence=prediction["confidence"],

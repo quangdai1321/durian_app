@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_URL } from "../constants/Config";
 
-const BASE_URL = "https://durianapp-production.up.railway.app/api";
+const BASE_URL = API_URL;
 
 async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem("access_token");

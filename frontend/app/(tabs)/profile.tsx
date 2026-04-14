@@ -10,6 +10,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../hooks/useAuth";
 import { diagnosisApi, authApi, yieldStatsApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
+import { API_BASE_URL } from "../../constants/Config";
 
 const SCREEN_W = Dimensions.get("window").width;
 const YIELD_KEY = "yield_stats";
@@ -580,7 +581,7 @@ const ym = StyleSheet.create({
   recNote:    { marginTop: 6, fontSize: 12, color: Colors.textMuted, fontStyle: "italic" },
 });
 
-const BASE_URL = "https://durianapp-production.up.railway.app";
+const BASE_URL = API_BASE_URL;
 
 const DISEASE_LABELS: Record<string, string> = {
   Leaf_Algal:          "Tảo lá",

@@ -5,8 +5,9 @@ import {
   TextInput, KeyboardAvoidingView,
 } from "react-native";
 import { Colors } from "../../constants/Colors";
+import { API_URL } from "../../constants/Config";
 
-const BASE_URL = "http://localhost:8000/api";
+const BASE_URL = API_URL;
 
 interface NewsItem {
   title:   string;

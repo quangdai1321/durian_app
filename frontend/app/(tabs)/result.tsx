@@ -8,8 +8,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useFocusEffect } from "expo-router";
 import { diagnosisApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
+import { API_BASE_URL } from "../../constants/Config";
 
-const BASE_URL  = "https://durianapp-production.up.railway.app";
+const BASE_URL = API_BASE_URL;
 const { width } = Dimensions.get("window");
 const IS_WEB    = Platform.OS === "web";
 

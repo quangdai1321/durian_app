@@ -1,5 +1,4 @@
 import uuid
-import aiofiles
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +7,6 @@ from ..database import get_db
 from ..models.models import User
 from ..schemas.schemas import UserRegister, UserLogin, Token, UserOut, UserUpdate
 from ..services.auth_service import hash_password, authenticate_user, create_access_token, get_user_by_id
-from ..config import settings
 from .deps import get_current_user
 
 ALLOWED_IMG = {".jpg", ".jpeg", ".png", ".webp"}
@@ -126,19 +124,10 @@ async def upload_avatar(
     import base64
     avatar_b64 = "data:image/jpeg;base64," + base64.b64encode(content).decode()
 
-    # Vẫn lưu file cho local dev (không ảnh hưởng production)
-    try:
-        upload_dir = Path(settings.UPLOAD_DIR) / "avatars"
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        filename   = f"avatar_{current_user.id}{ext}"
-        save_path  = upload_dir / filename
-        async with aiofiles.open(save_path, "wb") as f:
-            await f.write(content)
-        current_user.avatar_url = f"/uploads/avatars/{filename}"
-    except Exception:
-        pass
-
+    # Lưu avatar_data (base64) vào DB — đây là nguồn ảnh chính, persistent
     current_user.avatar_data = avatar_b64
+    # Đặt avatar_url dạng data URI để frontend dùng trực tiếp mà không cần file server
+    current_user.avatar_url  = None   # không dùng file path nữa
     db.add(current_user)
     await db.flush()
     await db.refresh(current_user)
