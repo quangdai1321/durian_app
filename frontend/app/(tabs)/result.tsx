@@ -11,6 +11,8 @@ import { Colors } from "../../constants/Colors";
 
 const BASE_URL  = "https://durianapp-production.up.railway.app";
 const { width } = Dimensions.get("window");
+const IS_WEB    = Platform.OS === "web";
+const HERO_H_WEB = 260;
 
 const LABEL_VI: Record<string, string> = {
   Leaf_Algal:          "Bệnh đốm tảo",
@@ -153,6 +155,17 @@ export default function ResultScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+
+          {/* ── Web: Image preview card ── */}
+          {IS_WEB && diagnosis.image_url && (
+            <View style={styles.webImgCard}>
+              <Image
+                source={{ uri: `${BASE_URL}${diagnosis.image_url}` }}
+                style={styles.webImg}
+                resizeMode="contain"
+              />
+            </View>
+          )}
 
           {/* ── Main result card ── */}
           <View style={styles.mainCard}>
@@ -348,13 +361,13 @@ function MetaChip({ icon, label, value }: { icon: string; label: string; value: 
   );
 }
 
-const HERO_H = 340;
+const HERO_H = IS_WEB ? HERO_H_WEB : 340;
 
 const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: "#f0f4f0" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, backgroundColor: "#f0f4f0" },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16 },
+  scrollContent: { paddingHorizontal: IS_WEB ? 32 : 16, paddingTop: 16, maxWidth: IS_WEB ? 860 : undefined, alignSelf: IS_WEB ? "center" : undefined, width: IS_WEB ? "100%" : undefined },
 
   // Empty state
   emptyTitle:   { fontSize: 20, fontWeight: "800", color: Colors.primary, marginBottom: 6 },
@@ -369,10 +382,12 @@ const styles = StyleSheet.create({
   // Hero
   heroWrap: { width: "100%", height: HERO_H, position: "relative" },
   heroImg:  { width: "100%", height: HERO_H, position: "absolute" },
+  webImgCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  webImg: { width: "100%", height: 320 },
   heroPlaceholder: { backgroundColor: "#c8e6c9", justifyContent: "center", alignItems: "center" },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: IS_WEB ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.45)",
   },
   heroNav: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
