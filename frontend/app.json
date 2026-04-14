@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Nhận Diện Bệnh Sầu Riêng",
+    "slug": "durian-disease-detection",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1a5c2a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "vn.edu.hutech.durian",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cần truy cập camera để chụp ảnh lá sầu riêng cho chẩn đoán bệnh.",
+        "NSPhotoLibraryUsageDescription": "Cần truy cập thư viện ảnh để chọn ảnh lá sầu riêng.",
+        "NSLocationWhenInUseUsageDescription": "Vị trí giúp theo dõi phân bố bệnh theo khu vực."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a5c2a"
+      },
+      "package": "vn.edu.hutech.durian",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-image-picker",
+      "expo-location"
+    ],
+    "scheme": "durian"
+  }
+}

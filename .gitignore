@@ -1,0 +1,47 @@
+# ── Secrets — KHÔNG BAO GIỜ commit lên git ─────────────────────
+.env
+*.env
+.env.local
+.env.production
+
+# ── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── AI Model (file lớn) ──────────────────────────────────────────
+models/*.pt
+models/*.onnx
+*.pt
+*.weights
+
+# ── Uploads (ảnh người dùng) ─────────────────────────────────────
+uploads/
+
+# ── Node / Expo ──────────────────────────────────────────────────
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# ── Database local ───────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+backend_*.log
+frontend_*.log
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

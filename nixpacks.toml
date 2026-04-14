@@ -1,0 +1,6 @@
+# Nixpacks config for Railway deployment
+# Dùng requirements-railway.txt thay vì requirements.txt
+# để tránh cài torch/ultralytics (2GB+) lên Railway
+
+[phases.install]
+cmds = ["pip install --upgrade pip", "pip install -r requirements-railway.txt"]

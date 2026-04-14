@@ -1,0 +1,22 @@
+# File: /etc/systemd/system/durian.service
+# Tự động khởi động backend khi VPS reboot
+
+[Unit]
+Description=Durian App FastAPI Backend
+After=network.target postgresql.service
+
+[Service]
+User=durian
+WorkingDirectory=/home/durian/app
+Environment="PATH=/home/durian/app/backend/venv/bin"
+ExecStart=/home/durian/app/backend/venv/bin/uvicorn backend.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
