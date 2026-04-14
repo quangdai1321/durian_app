@@ -12,12 +12,12 @@ import { API_BASE_URL } from "../../constants/Config";
 const BASE_URL = API_BASE_URL;
 
 const LABEL_VI: Record<string, string> = {
-  Leaf_Algal:          "Đốm tảo (tảo ký sinh)",
-  Leaf_Blight:         "Cháy lá (Phytophthora)",
-  Leaf_Colletotrichum: "Thán thư (đốm nâu)",
-  Leaf_Healthy:        "Khỏe mạnh",
-  Leaf_Phomopsis:      "Khô đầu lá (Phomopsis)",
-  Leaf_Rhizoctonia:    "Lở cổ rễ / đốm lá (Rhizoctonia)",
+  Leaf_Algal:          "Bệnh đốm tảo (tảo ký sinh)",
+  Leaf_Blight:         "Bệnh cháy lá (Phytophthora)",
+  Leaf_Colletotrichum: "Bệnh thán thư (đốm nâu)",
+  Leaf_Healthy:        "Lá khỏe mạnh",
+  Leaf_Phomopsis:      "Bệnh khô đầu lá (Phomopsis)",
+  Leaf_Rhizoctonia:    "Bệnh lở cổ rễ / đốm lá (Rhizoctonia)",
 };
 
 export default function HistoryScreen() {

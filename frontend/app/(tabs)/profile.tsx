@@ -584,12 +584,12 @@ const ym = StyleSheet.create({
 const BASE_URL = API_BASE_URL;
 
 const DISEASE_LABELS: Record<string, string> = {
-  Leaf_Algal:          "Tảo lá",
-  Leaf_Blight:         "Cháy lá",
-  Leaf_Colletotrichum: "Colletotrichum",
-  Leaf_Healthy:        "Khỏe mạnh",
-  Leaf_Phomopsis:      "Phomopsis",
-  Leaf_Rhizoctonia:    "Rhizoctonia",
+  Leaf_Algal:          "Bệnh đốm tảo (tảo ký sinh)",
+  Leaf_Blight:         "Bệnh cháy lá (Phytophthora)",
+  Leaf_Colletotrichum: "Bệnh thán thư (đốm nâu)",
+  Leaf_Healthy:        "Lá khỏe mạnh",
+  Leaf_Phomopsis:      "Bệnh khô đầu lá (Phomopsis)",
+  Leaf_Rhizoctonia:    "Bệnh lở cổ rễ / đốm lá (Rhizoctonia)",
 };
 
 const PROVINCES = [
@@ -908,10 +908,10 @@ export default function ProfileScreen() {
               <View style={[s.diagDot, { backgroundColor: d.predicted_class?.includes("Healthy") ? Colors.success : Colors.warning }]} />
               <View style={{ flex: 1 }}>
                 <Text style={s.diagClass}>
-                  {DISEASE_LABELS[d.predicted_class] || d.predicted_class}
+                  {d.disease?.name_vi || DISEASE_LABELS[d.predicted_class] || d.predicted_class}
                 </Text>
                 <Text style={s.diagMeta}>
-                  {Math.round((d.confidence || 0) * 100)}% tự tin
+                  Độ tin cậy: {Math.round((d.confidence || 0) * 100)}%
                   {d.province ? ` · ${fixProvince(d.province)}` : ""}
                 </Text>
               </View>
