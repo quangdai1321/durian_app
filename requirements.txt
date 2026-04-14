@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 sqlalchemy==2.0.30
@@ -12,3 +14,7 @@ aiofiles==23.2.1
 httpx==0.27.0
 python-dotenv==1.0.1
 numpy==1.26.4
+# AI inference — CPU-only PyTorch để giảm kích thước container
+torch==2.2.2+cpu
+torchvision==0.17.2+cpu
+ultralytics==8.2.0

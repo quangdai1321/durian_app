@@ -15,10 +15,11 @@ env/
 dist/
 build/
 
-# ── AI Model (file lớn) ──────────────────────────────────────────
-models/*.pt
+# ── AI Model ─────────────────────────────────────────────────────
+# best.pt (3.2 MB) được commit để deploy lên Railway
+# Các model lớn khác vẫn bị exclude
+!models/best.pt
 models/*.onnx
-*.pt
 *.weights
 
 # ── Uploads (ảnh người dùng) ─────────────────────────────────────

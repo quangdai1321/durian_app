@@ -94,12 +94,16 @@ export default function CameraScreen() {
         result.image_data = uri;
       }
       await AsyncStorage.setItem("last_diagnosis", JSON.stringify(result));
-      // Append to local history for guest users
+      // Append to local history — KHÔNG lưu image_data (base64 ~80KB/record)
+      // tránh tràn localStorage quota trên mobile web (iOS Safari ~5MB)
       const raw = await AsyncStorage.getItem("local_history");
       const localHistory: any[] = raw ? JSON.parse(raw) : [];
-      localHistory.unshift(result); // newest first
-      if (localHistory.length > 50) localHistory.pop(); // cap at 50
-      await AsyncStorage.setItem("local_history", JSON.stringify(localHistory));
+      const { image_data: _drop, ...resultWithoutImg } = result;  // strip base64
+      localHistory.unshift(resultWithoutImg);
+      if (localHistory.length > 30) localHistory.pop(); // cap at 30
+      try {
+        await AsyncStorage.setItem("local_history", JSON.stringify(localHistory));
+      } catch { /* quota exceeded — history không critical, bỏ qua */ }
       router.push("/(tabs)/result");
     } catch (e: any) {
       // Check NOT_DURIAN_LEAF error từ backend
