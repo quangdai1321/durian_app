@@ -43,11 +43,24 @@ async def create_diagnosis(
     if len(content) > MAX_BYTES:
         raise HTTPException(413, f"File exceeds {settings.MAX_FILE_SIZE_MB} MB limit")
 
-    # Save image
+    # Save image + resize về max 800×800 để tăng tốc xử lý
     upload_dir = Path(settings.UPLOAD_DIR)
     upload_dir.mkdir(parents=True, exist_ok=True)
     filename   = f"{uuid.uuid4()}{ext}"
     image_path = upload_dir / filename
+
+    # Resize bằng PIL trước khi lưu (giảm thời gian OpenAI + YOLO)
+    try:
+        from PIL import Image as PILImage
+        import io
+        pil_img = PILImage.open(io.BytesIO(content)).convert("RGB")
+        pil_img.thumbnail((800, 800), PILImage.LANCZOS)  # max 800×800, giữ tỉ lệ
+        buf = io.BytesIO()
+        pil_img.save(buf, format="JPEG", quality=85)
+        content = buf.getvalue()
+    except Exception:
+        pass  # Nếu lỗi → dùng ảnh gốc
+
     async with aiofiles.open(image_path, "wb") as f:
         await f.write(content)
 
