@@ -129,6 +129,14 @@ export const yieldStatsApi = {
     request("PUT", "/auth/me/yield-stats", { records }),
 };
 
+// ── News ─────────────────────────────────────────────────────
+export const newsApi = {
+  list: () => request("GET", "/news"),
+  prices: () => request("GET", "/news/prices"),
+  article: (url: string) => request("GET", `/news/article?url=${encodeURIComponent(url)}`),
+  search: (q: string) => request("GET", `/news/search?q=${encodeURIComponent(q)}`),
+};
+
 // ── AI Chat (proxy qua backend — OpenAI key không lộ ở frontend) ──
 export const chatApi = {
   /**

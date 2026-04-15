@@ -5,9 +5,7 @@ import {
   TextInput, KeyboardAvoidingView,
 } from "react-native";
 import { Colors } from "../../constants/Colors";
-import { API_URL } from "../../constants/Config";
-
-const BASE_URL = API_URL;
+import { newsApi } from "../../services/api";
 
 interface NewsItem {
   title:   string;
@@ -74,9 +72,8 @@ function ArticleModal({ item, onClose }: { item: NewsItem | null; onClose: () =>
     }
 
     setLoading(true);
-    fetch(`${BASE_URL}/news/article?url=${encodeURIComponent(item.link)}`)
-      .then(r => r.json())
-      .then(d => {
+    newsApi.article(item.link)
+      .then((d: any) => {
         if (d.blocked) {
           setArtTitle(item.title);
           setContent(item.summary || "");
@@ -285,13 +282,11 @@ export default function NewsScreen() {
     else if (!hasCached) setLoading(true);
     setError("");
     try {
-      const [newsRes, priceRes] = await Promise.all([
-        fetch(`${BASE_URL}/news`),
-        fetch(`${BASE_URL}/news/prices`),
-      ]);
-      if (!newsRes.ok) throw new Error("Không thể tải tin tức");
-      const nd = await newsRes.json();
-      const pd = priceRes.ok ? await priceRes.json() : null;
+      const [nd, pd] = await Promise.all([
+        newsApi.list(),
+        newsApi.prices().catch(() => null),
+      ]) as any[];
+      if (!nd) throw new Error("Không thể tải tin tức");
       _cache.items = nd.items || [];
       _cache.prices = pd?.prices || [];
       _cache.priceDate = pd?.updated || "";
@@ -312,8 +307,7 @@ export default function NewsScreen() {
     setSearchError("");
     setSearchItems([]);
     try {
-      const res = await fetch(`${BASE_URL}/news/search?q=${encodeURIComponent(q)}`);
-      const d = await res.json();
+      const d: any = await newsApi.search(q);
       setSearchItems(d.items || []);
       if (!d.items?.length) setSearchError("Không tìm thấy kết quả");
     } catch {
