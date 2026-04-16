@@ -396,31 +396,17 @@ function ReminderModal({
 
             {/* Date picker trigger */}
             {Platform.OS === "web" ? (
-              /* Web: HTML <input type="date"> styled như pickerTrigger */
-              // @ts-ignore
-              <label style={{
-                display: "flex", flexDirection: "row", alignItems: "center", gap: 10,
-                backgroundColor: "#e8f5e9", borderRadius: 12,
-                border: "1.5px solid #a5d6a7", padding: "11px 16px",
-                cursor: "pointer", marginBottom: 4,
-              }}>
-                {/* @ts-ignore */}
-                <span style={{ fontSize: 20 }}>📅</span>
-                {/* @ts-ignore */}
-                <input
-                  type="date"
+              /* Web: TextInput với type="date" — React Native Web render thành <input type="date"> */
+              <View style={ms.pickerTrigger}>
+                <Text style={ms.pickerTriggerIcon}>📅</Text>
+                <TextInput
+                  {...({ type: "date", min: getDateStr(0) } as any)}
                   value={date}
-                  min={getDateStr(0)}
-                  onChange={(e: any) => setDate(e.target.value)}
-                  style={{
-                    flex: 1, border: "none", background: "transparent",
-                    fontSize: 16, fontWeight: "700", color: "#1a5c2a",
-                    fontFamily: "inherit", cursor: "pointer", outline: "none",
-                  } as any}
+                  onChangeText={setDate}
+                  style={[ms.pickerTriggerValue, ms.webDateInput]}
                 />
-                {/* @ts-ignore */}
-                <span style={{ fontSize: 11, color: "#6b7c6b" }}>Chọn ngày</span>
-              </label>
+                <Text style={ms.pickerTriggerHint}>Chọn ngày</Text>
+              </View>
             ) : (
               /* Mobile: TouchableOpacity mở DateTimePicker */
               <TouchableOpacity
@@ -473,30 +459,17 @@ function ReminderModal({
 
             {/* Time picker trigger */}
             {Platform.OS === "web" ? (
-              /* Web: HTML <input type="time"> styled như pickerTrigger */
-              // @ts-ignore
-              <label style={{
-                display: "flex", flexDirection: "row", alignItems: "center", gap: 10,
-                backgroundColor: "#e8f5e9", borderRadius: 12,
-                border: "1.5px solid #a5d6a7", padding: "11px 16px",
-                cursor: "pointer", marginBottom: 4,
-              }}>
-                {/* @ts-ignore */}
-                <span style={{ fontSize: 20 }}>🕐</span>
-                {/* @ts-ignore */}
-                <input
-                  type="time"
+              /* Web: TextInput với type="time" — React Native Web render thành <input type="time"> */
+              <View style={ms.pickerTrigger}>
+                <Text style={ms.pickerTriggerIcon}>🕐</Text>
+                <TextInput
+                  {...({ type: "time" } as any)}
                   value={time}
-                  onChange={(e: any) => setTime(e.target.value)}
-                  style={{
-                    flex: 1, border: "none", background: "transparent",
-                    fontSize: 16, fontWeight: "700", color: "#1a5c2a",
-                    fontFamily: "inherit", cursor: "pointer", outline: "none",
-                  } as any}
+                  onChangeText={setTime}
+                  style={[ms.pickerTriggerValue, ms.webDateInput]}
                 />
-                {/* @ts-ignore */}
-                <span style={{ fontSize: 11, color: "#6b7c6b" }}>Chọn giờ</span>
-              </label>
+                <Text style={ms.pickerTriggerHint}>Chọn giờ</Text>
+              </View>
             ) : (
               /* Mobile: TouchableOpacity mở TimePicker */
               <TouchableOpacity
@@ -840,13 +813,13 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
   const sev = disease?.severity ? SEVERITY_LABEL[disease.severity] : SEVERITY_LABEL.moderate;
 
   return (
+    <AuthGuard>
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
     >
       {/* ── Header ── */}
-    <AuthGuard>
       <View style={styles.header}>
         {/* Spacer left — cân bằng */}
         <View style={styles.headerRight} />
@@ -1262,6 +1235,13 @@ const ms = StyleSheet.create({
   pickerTriggerIcon:  { fontSize: 20 },
   pickerTriggerValue: { flex: 1, fontSize: 16, fontWeight: "700", color: Colors.primary },
   pickerTriggerHint:  { fontSize: 11, color: Colors.textMuted },
+  // Web: TextInput behaves like <input type="date/time"> — remove default border/bg
+  webDateInput: {
+    flex: 1,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    padding: 0,
+  } as any,
 
   // Native DateTimePicker (iOS spinner style)
   nativePicker: {
