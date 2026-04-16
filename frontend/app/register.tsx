@@ -7,9 +7,25 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../hooks/useAuth";
 import { Colors } from "../constants/Colors";
 
+/** 34 đơn vị hành chính cấp tỉnh Việt Nam (sau sáp nhập 2025) */
 const PROVINCES = [
-  "Tiền Giang","Bến Tre","Đồng Nai","Bình Phước",
-  "Đắk Lắk","Đắk Nông","Lâm Đồng","Khánh Hòa",
+  // Miền Bắc
+  "Hà Nội", "Hải Phòng", "Quảng Ninh",
+  "Bắc Giang", "Thái Nguyên", "Tuyên Quang",
+  "Lào Cai", "Yên Bái", "Sơn La", "Lạng Sơn",
+  "Hưng Yên",
+  // Miền Trung
+  "Thanh Hóa", "Nghệ An", "Hà Tĩnh",
+  "Huế", "Đà Nẵng",
+  "Bình Định", "Khánh Hòa",
+  // Tây Nguyên
+  "Gia Lai", "Đắk Lắk", "Lâm Đồng",
+  // Đông Nam Bộ
+  "Bình Phước", "Tây Ninh", "Bình Dương",
+  "Đồng Nai", "Bà Rịa - Vũng Tàu", "Hồ Chí Minh",
+  // Đồng bằng sông Cửu Long
+  "Long An", "Tiền Giang", "An Giang",
+  "Cần Thơ", "Kiên Giang", "Sóc Trăng", "Bạc Liêu",
 ];
 
 interface FieldProps {

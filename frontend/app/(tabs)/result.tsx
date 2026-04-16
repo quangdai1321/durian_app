@@ -9,6 +9,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { diagnosisApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
 import { API_BASE_URL } from "../../constants/Config";
+import AuthGuard from "../../components/AuthGuard";
 
 const BASE_URL = API_BASE_URL;
 const { width } = Dimensions.get("window");
@@ -114,6 +115,7 @@ export default function ResultScreen() {
     || (diagnosis.image_url ? `${BASE_URL}${diagnosis.image_url}` : null);
 
   return (
+    <AuthGuard>
     <View style={styles.root}>
 
       {/* ── Compact nav bar ── */}
@@ -335,6 +337,7 @@ export default function ResultScreen() {
         </Animated.View>
       </ScrollView>
     </View>
+    </AuthGuard>
   );
 }
 

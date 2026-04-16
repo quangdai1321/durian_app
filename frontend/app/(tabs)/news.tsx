@@ -6,6 +6,7 @@ import {
 } from "react-native";
 import { Colors } from "../../constants/Colors";
 import { newsApi } from "../../services/api";
+import AuthGuard from "../../components/AuthGuard";
 
 interface NewsItem {
   title:   string;
@@ -328,6 +329,7 @@ export default function NewsScreen() {
   const isSearchMode = query.trim().length > 0;
 
   return (
+    <AuthGuard>
     <View style={s.root}>
       {/* Header */}
       <View style={s.header}>
@@ -431,6 +433,7 @@ export default function NewsScreen() {
         </ScrollView>
       )}
     </View>
+    </AuthGuard>
   );
 }
 

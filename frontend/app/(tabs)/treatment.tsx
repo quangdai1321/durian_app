@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { diseaseApi, chatApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
+import AuthGuard from "../../components/AuthGuard";
 
 // ── expo-notifications (chỉ mobile, không có trên web) ────────────
 let Notifications: any = null;
@@ -206,16 +207,20 @@ function ReminderModal({
     }
 
     // ── Confirm trước khi lưu ──
-    const repeatLabel  = REPEAT_OPTIONS.find(r => r.key === repeat)?.label ?? "";
-    const beforeLabel  = REMIND_BEFORE.find(r => r.key === remindBefore)?.label ?? "";
-    Alert.alert(
-      "Xác nhận lưu lịch nhắc?",
-      `${selectedTask.icon} ${selectedTask.label}\n📅 ${formatDateVN(date)} lúc ${time}\n🔁 ${repeatLabel}  🔔 ${beforeLabel}${customNote ? `\n📝 ${customNote}` : ""}`,
-      [
+    const repeatLabel = REPEAT_OPTIONS.find(r => r.key === repeat)?.label ?? "";
+    const beforeLabel = REMIND_BEFORE.find(r => r.key === remindBefore)?.label ?? "";
+    const msg = `${selectedTask.icon} ${selectedTask.label}\n📅 ${formatDateVN(date)} lúc ${time}\n🔁 ${repeatLabel}  🔔 ${beforeLabel}${customNote ? `\n📝 ${customNote}` : ""}`;
+
+    if (Platform.OS === "web") {
+      // Web: dùng window.confirm (synchronous, không cần callback)
+      const ok = (globalThis as any).confirm?.(`Xác nhận lưu lịch nhắc?\n\n${msg}`);
+      if (ok) doSave();
+    } else {
+      Alert.alert("Xác nhận lưu lịch nhắc?", msg, [
         { text: "Huỷ", style: "cancel" },
-        { text: "✅ Lưu", style: "default", onPress: () => doSave() },
-      ]
-    );
+        { text: "✅ Lưu", onPress: () => doSave() },
+      ]);
+    }
   }
 
   async function doSave() {
@@ -391,25 +396,31 @@ function ReminderModal({
 
             {/* Date picker trigger */}
             {Platform.OS === "web" ? (
-              /* Web: hiển thị trigger + HTML input date bên dưới */
-              <>
-                <View style={ms.pickerTrigger} pointerEvents="none">
-                  <Text style={ms.pickerTriggerIcon}>📅</Text>
-                  <Text style={ms.pickerTriggerValue}>{formatDateVN(date)}</Text>
-                  <Text style={ms.pickerTriggerHint}>Nhấn để chọn ngày</Text>
-                </View>
-                {/* @ts-ignore – HTML input element on web */}
+              /* Web: HTML <input type="date"> styled như pickerTrigger */
+              // @ts-ignore
+              <label style={{
+                display: "flex", flexDirection: "row", alignItems: "center", gap: 10,
+                backgroundColor: "#e8f5e9", borderRadius: 12,
+                border: "1.5px solid #a5d6a7", padding: "11px 16px",
+                cursor: "pointer", marginBottom: 4,
+              }}>
+                {/* @ts-ignore */}
+                <span style={{ fontSize: 20 }}>📅</span>
+                {/* @ts-ignore */}
                 <input
                   type="date"
                   value={date}
                   min={getDateStr(0)}
                   onChange={(e: any) => setDate(e.target.value)}
                   style={{
-                    marginTop: -48, height: 48, width: "100%", opacity: 0,
-                    cursor: "pointer", position: "relative", zIndex: 10,
+                    flex: 1, border: "none", background: "transparent",
+                    fontSize: 16, fontWeight: "700", color: "#1a5c2a",
+                    fontFamily: "inherit", cursor: "pointer", outline: "none",
                   } as any}
                 />
-              </>
+                {/* @ts-ignore */}
+                <span style={{ fontSize: 11, color: "#6b7c6b" }}>Chọn ngày</span>
+              </label>
             ) : (
               /* Mobile: TouchableOpacity mở DateTimePicker */
               <TouchableOpacity
@@ -462,24 +473,30 @@ function ReminderModal({
 
             {/* Time picker trigger */}
             {Platform.OS === "web" ? (
-              /* Web: hiển thị trigger + HTML input time bên dưới */
-              <>
-                <View style={ms.pickerTrigger} pointerEvents="none">
-                  <Text style={ms.pickerTriggerIcon}>🕐</Text>
-                  <Text style={ms.pickerTriggerValue}>{time}</Text>
-                  <Text style={ms.pickerTriggerHint}>Nhấn để chọn giờ</Text>
-                </View>
+              /* Web: HTML <input type="time"> styled như pickerTrigger */
+              // @ts-ignore
+              <label style={{
+                display: "flex", flexDirection: "row", alignItems: "center", gap: 10,
+                backgroundColor: "#e8f5e9", borderRadius: 12,
+                border: "1.5px solid #a5d6a7", padding: "11px 16px",
+                cursor: "pointer", marginBottom: 4,
+              }}>
+                {/* @ts-ignore */}
+                <span style={{ fontSize: 20 }}>🕐</span>
                 {/* @ts-ignore */}
                 <input
                   type="time"
                   value={time}
                   onChange={(e: any) => setTime(e.target.value)}
                   style={{
-                    marginTop: -48, height: 48, width: "100%", opacity: 0,
-                    cursor: "pointer", position: "relative", zIndex: 10,
+                    flex: 1, border: "none", background: "transparent",
+                    fontSize: 16, fontWeight: "700", color: "#1a5c2a",
+                    fontFamily: "inherit", cursor: "pointer", outline: "none",
                   } as any}
                 />
-              </>
+                {/* @ts-ignore */}
+                <span style={{ fontSize: 11, color: "#6b7c6b" }}>Chọn giờ</span>
+              </label>
             ) : (
               /* Mobile: TouchableOpacity mở TimePicker */
               <TouchableOpacity
@@ -649,12 +666,17 @@ function ReminderModal({
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={ms.delBtn}
-                        onPress={() =>
-                          Alert.alert("Xoá lịch?", `${item.taskIcon} ${item.taskLabel}\n${formatDateVN(item.date)} ${item.time}`, [
-                            { text: "Huỷ", style: "cancel" },
-                            { text: "Xoá", style: "destructive", onPress: () => handleDelete(item.id) },
-                          ])
-                        }
+                        onPress={() => {
+                          const msg = `Xoá lịch?\n${item.taskIcon} ${item.taskLabel}\n${formatDateVN(item.date)} ${item.time}`;
+                          if (Platform.OS === "web") {
+                            if ((globalThis as any).confirm?.(msg)) handleDelete(item.id);
+                          } else {
+                            Alert.alert("Xoá lịch?", `${item.taskIcon} ${item.taskLabel}\n${formatDateVN(item.date)} ${item.time}`, [
+                              { text: "Huỷ", style: "cancel" },
+                              { text: "Xoá", style: "destructive", onPress: () => handleDelete(item.id) },
+                            ]);
+                          }
+                        }}
                       >
                         <Text style={ms.delBtnText}>🗑</Text>
                       </TouchableOpacity>
@@ -824,6 +846,7 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
     >
       {/* ── Header ── */}
+    <AuthGuard>
       <View style={styles.header}>
         {/* Spacer left — cân bằng */}
         <View style={styles.headerRight} />
@@ -1023,6 +1046,7 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
       {/* Reminder Modal */}
       <ReminderModal visible={showReminder} onClose={() => setShowReminder(false)} />
     </KeyboardAvoidingView>
+    </AuthGuard>
   );
 }
 

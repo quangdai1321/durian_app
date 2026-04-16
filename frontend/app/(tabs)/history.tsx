@@ -8,6 +8,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { diagnosisApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
 import { API_BASE_URL } from "../../constants/Config";
+import AuthGuard from "../../components/AuthGuard";
 
 const BASE_URL = API_BASE_URL;
 
@@ -104,6 +105,7 @@ export default function HistoryScreen() {
   };
 
   return (
+    <AuthGuard>
     <View style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>📋 Lịch sử chẩn đoán</Text>
@@ -141,6 +143,7 @@ export default function HistoryScreen() {
         <Text style={styles.fabText}>📷</Text>
       </TouchableOpacity>
     </View>
+    </AuthGuard>
   );
 }
 
