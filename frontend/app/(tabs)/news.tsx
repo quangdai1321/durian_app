@@ -189,6 +189,8 @@ function PriceModal({ visible, onClose, prices, priceDate }: {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={pm.overlay}>
         <View style={pm.sheet}>
+
+          {/* ── Header ── */}
           <View style={pm.header}>
             <View>
               <Text style={pm.title}>💰 Bảng giá sầu riêng</Text>
@@ -198,60 +200,66 @@ function PriceModal({ visible, onClose, prices, priceDate }: {
               <Text style={pm.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
-          {prices.length > 0 && (
-            <View style={pm.liveBox}>
-              <Text style={pm.liveTitle}>📡 Giá thực tế hôm nay · Nhấn để xem nguồn</Text>
-              <View style={pm.liveRow}>
-                {prices.map((p, i) => {
-                  const isRef = p.source === "Tham khảo";
-                  return (
-                    <TouchableOpacity key={i}
-                      style={[pm.chip, isRef && { borderWidth: 1, borderColor: "#ffd54f44", opacity: 0.85 }]}
-                      activeOpacity={0.75}
-                      onPress={() => !isRef && p.link && openExternal(p.link)}>
-                      {isRef && (
-                        <View style={{ backgroundColor: "#ffd54f22", borderRadius: 4, paddingHorizontal: 4, marginBottom: 2, alignSelf: "flex-start" }}>
-                          <Text style={{ fontSize: 9, color: "#ffd54f" }}>THAM KHẢO</Text>
-                        </View>
-                      )}
-                      <Text style={pm.chipVariety}>{p.variety}</Text>
-                      <Text style={[pm.chipPrice, isRef && { color: "#ffd54f" }]}>
-                        {p.price.toLocaleString("vi-VN")}đ/kg
-                      </Text>
-                      {!isRef && p.source ? <Text style={pm.chipSource}>📰 {p.source} →</Text> : null}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
+
           <ScrollView style={pm.scroll} showsVerticalScrollIndicator={false}>
-            <Text style={pm.tableTitle}>📋 Bảng tham khảo chi tiết</Text>
-            <View style={[pm.row, pm.headRow]}>
-              <Text style={[pm.col1, pm.headText]}>Sản phẩm</Text>
-              <Text style={[pm.col2, pm.headText]}>Giá tham khảo</Text>
-            </View>
-            {PRICE_TABLE.map((r, i) => (
-              <View key={i} style={[pm.row, i % 2 === 0 ? pm.rowEven : pm.rowOdd]}>
-                <View style={pm.col1}>
-                  <View style={pm.rowTop}>
-                    <View style={[pm.tag, { backgroundColor: r.tagColor + "22" }]}>
-                      <Text style={[pm.tagText, { color: r.tagColor }]}>{r.tag}</Text>
-                    </View>
-                    <Text style={pm.rowName}>{r.name}</Text>
+
+            {/* ── Live prices: horizontal scroll ── */}
+            {prices.length > 0 && (
+              <View style={pm.liveBox}>
+                <Text style={pm.liveTitle}>📡 Giá thực tế hôm nay · Nhấn để xem nguồn</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 2 }}>
+                  <View style={pm.liveRow}>
+                    {prices.map((p, i) => {
+                      const isRef = p.source === "Tham khảo";
+                      return (
+                        <TouchableOpacity key={i}
+                          style={[pm.chip, isRef && pm.chipRef]}
+                          activeOpacity={0.75}
+                          onPress={() => !isRef && p.link && openExternal(p.link)}>
+                          {isRef && <Text style={pm.chipRefLabel}>THAM KHẢO</Text>}
+                          <Text style={pm.chipVariety}>{p.variety}</Text>
+                          <Text style={[pm.chipPrice, isRef && { color: "#ffd54f99" }]}>
+                            {p.price.toLocaleString("vi-VN")}đ/kg
+                          </Text>
+                          {!isRef && p.source
+                            ? <Text style={pm.chipSource} numberOfLines={1}>📰 {p.source}</Text>
+                            : null}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <Text style={pm.rowUse}>{r.use}</Text>
-                  <Text style={pm.rowRegion}>📍 {r.region}</Text>
+                </ScrollView>
+              </View>
+            )}
+
+            {/* ── Reference table: card list ── */}
+            <Text style={pm.tableTitle}>📋 Bảng tham khảo chi tiết</Text>
+            {PRICE_TABLE.map((r, i) => (
+              <View key={i} style={pm.card}>
+                {/* Top row: tag + name */}
+                <View style={pm.cardTop}>
+                  <View style={[pm.tag, { backgroundColor: r.tagColor + "22" }]}>
+                    <Text style={[pm.tagText, { color: r.tagColor }]}>{r.tag}</Text>
+                  </View>
+                  <Text style={pm.cardName} numberOfLines={2}>{r.name}</Text>
                 </View>
-                <View style={pm.col2}>
-                  <Text style={pm.rowPrice}>{r.range}</Text>
+                {/* Bottom row: info + price */}
+                <View style={pm.cardBottom}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={pm.cardUse} numberOfLines={1}>{r.use}</Text>
+                    <Text style={pm.cardRegion}>📍 {r.region}</Text>
+                  </View>
+                  <View style={pm.cardPriceWrap}>
+                    <Text style={[pm.cardPrice, { color: r.tagColor }]}>{r.range}</Text>
+                  </View>
                 </View>
               </View>
             ))}
+
             <View style={pm.note}>
-              <Text style={pm.noteText}>⚠️ Giá chỉ mang tính tham khảo, thay đổi theo mùa vụ.</Text>
+              <Text style={pm.noteText}>⚠️ Giá chỉ mang tính tham khảo, thay đổi theo mùa vụ và thị trường.</Text>
             </View>
-            <View style={{ height: 32 }} />
+            <View style={{ height: 40 }} />
           </ScrollView>
         </View>
       </View>
@@ -467,40 +475,46 @@ const am = StyleSheet.create({
 
 // ── Price Modal Styles ───────────────────────────────────────
 const pm = StyleSheet.create({
-  overlay:  { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet:    { backgroundColor: "#f5f7f5", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "92%", paddingBottom: Platform.OS === "ios" ? 36 : 20 },
-  header:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", backgroundColor: Colors.primary, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingVertical: 18 },
-  title:    { color: "#fff", fontSize: 20, fontWeight: "800" },
-  sub:      { color: "rgba(255,255,255,.75)", fontSize: 13, marginTop: 3 },
-  closeBtn: { backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 20, width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  closeBtnText: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  // Live price chips
-  liveBox:  { backgroundColor: "#e8f5e9", margin: 14, borderRadius: 14, padding: 14 },
-  liveTitle:{ fontSize: 13, fontWeight: "700", color: Colors.primary, marginBottom: 10 },
-  liveRow:  { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  chip:     { backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: "rgba(255,213,79,0.4)", minWidth: 120 },
-  chipVariety: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600" },
-  chipPrice:   { color: "#ffd54f", fontSize: 18, fontWeight: "800", marginTop: 4 },
-  chipSource:  { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 5 },
-  // Table
-  scroll:      { flex: 1, paddingHorizontal: 14 },
-  tableTitle:  { fontSize: 15, fontWeight: "800", color: Colors.text, marginBottom: 10, marginTop: 6 },
-  row:         { flexDirection: "row", paddingVertical: 14, paddingHorizontal: 10, borderRadius: 10, alignItems: "center" },
-  headRow:     { backgroundColor: Colors.primary, marginBottom: 6, borderRadius: 10 },
-  headText:    { color: "#fff", fontSize: 14, fontWeight: "800" },
-  rowEven:     { backgroundColor: "#fff", marginBottom: 2 },
-  rowOdd:      { backgroundColor: "#f0f7f0", marginBottom: 2 },
-  col1:        { flex: 1, paddingRight: 10 },
-  col2:        { width: 140, alignItems: "flex-end" },
-  rowTop:      { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 4 },
-  tag:         { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText:     { fontSize: 11, fontWeight: "700" },
-  rowName:     { fontSize: 15, fontWeight: "700", color: Colors.text, flex: 1, lineHeight: 20 },
-  rowUse:      { fontSize: 13, color: Colors.textMuted, lineHeight: 18, marginBottom: 4 },
-  rowRegion:   { fontSize: 12, color: Colors.accent, fontWeight: "600" },
-  rowPrice:    { fontSize: 15, fontWeight: "800", color: Colors.primary, textAlign: "right", lineHeight: 22 },
-  note:        { backgroundColor: "#fff8e1", borderRadius: 12, padding: 14, marginTop: 14, borderWidth: 1, borderColor: "#ffe082" },
-  noteText:    { fontSize: 13, color: "#bf360c", lineHeight: 20 },
+  overlay:      { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  sheet:        { backgroundColor: "#f4f7f4", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "94%", paddingBottom: Platform.OS === "ios" ? 36 : 16 },
+
+  // Header
+  header:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: Colors.primary, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingVertical: 16 },
+  title:        { color: "#fff", fontSize: 19, fontWeight: "800" },
+  sub:          { color: "rgba(255,255,255,.75)", fontSize: 12, marginTop: 2 },
+  closeBtn:     { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+  closeBtnText: { color: "#fff", fontSize: 17, fontWeight: "700" },
+
+  // Scroll
+  scroll:       { paddingHorizontal: 14 },
+
+  // Live price chips — horizontal scroll
+  liveBox:      { backgroundColor: "#e8f5e9", borderRadius: 14, padding: 12, marginTop: 14, marginBottom: 4 },
+  liveTitle:    { fontSize: 12, fontWeight: "700", color: Colors.primary, marginBottom: 10, letterSpacing: 0.3 },
+  liveRow:      { flexDirection: "row", gap: 10, paddingBottom: 4 },
+  chip:         { backgroundColor: Colors.primary, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, width: 148, borderWidth: 1, borderColor: "rgba(255,213,79,0.35)" },
+  chipRef:      { opacity: 0.75, borderStyle: "dashed" },
+  chipRefLabel: { fontSize: 9, color: "#ffd54f99", fontWeight: "700", letterSpacing: 0.5, marginBottom: 3 },
+  chipVariety:  { color: "rgba(255,255,255,0.88)", fontSize: 13, fontWeight: "600" },
+  chipPrice:    { color: "#ffd54f", fontSize: 20, fontWeight: "900", marginTop: 3 },
+  chipSource:   { color: "rgba(255,255,255,0.55)", fontSize: 10, marginTop: 6 },
+
+  // Reference table — card list
+  tableTitle:   { fontSize: 15, fontWeight: "800", color: Colors.text, marginTop: 18, marginBottom: 10 },
+  card:         { backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
+  cardTop:      { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 10 },
+  tag:          { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 2 },
+  tagText:      { fontSize: 11, fontWeight: "800" },
+  cardName:     { fontSize: 15, fontWeight: "700", color: Colors.text, flex: 1, lineHeight: 21 },
+  cardBottom:   { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  cardUse:      { fontSize: 12, color: Colors.textMuted, marginBottom: 4 },
+  cardRegion:   { fontSize: 12, color: Colors.accent, fontWeight: "600" },
+  cardPriceWrap:{ alignItems: "flex-end", minWidth: 110 },
+  cardPrice:    { fontSize: 15, fontWeight: "800", textAlign: "right", lineHeight: 20 },
+
+  // Note
+  note:         { backgroundColor: "#fff8e1", borderRadius: 12, padding: 14, marginTop: 8, borderWidth: 1, borderColor: "#ffe082" },
+  noteText:     { fontSize: 12, color: "#bf360c", lineHeight: 19 },
 });
 
 // ── Screen Styles ────────────────────────────────────────────
