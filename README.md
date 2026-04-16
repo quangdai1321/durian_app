@@ -9,6 +9,45 @@
 - Storage: Base64 trong PostgreSQL (không dùng filesystem — tương thích Railway PaaS)
 - Deploy: Railway (backend) + Expo (frontend)
 
+---
+
+## 🤖 AI Model — YOLOv26n-CLS 5-Fold Cross Validation
+
+| Thông số | Giá trị |
+|----------|---------|
+| Kiến trúc | YOLOv26n Classification |
+| Phương pháp train | 5-Fold Cross Validation |
+| Model được dùng | **Fold 5** (best fold) |
+| File | `backend/models/best.pt` (~3.2 MB) |
+
+### Kết quả 5-Fold CV (trung bình ± độ lệch chuẩn)
+
+| Metric | Giá trị |
+|--------|---------|
+| **Accuracy** | **95.58% ± 0.49%** |
+| **Macro F1** | **95.22% ± 0.60%** |
+| Rhizoctonia Recall | 93.11% ± 1.61% |
+
+### Kết quả từng fold
+
+| Fold | Accuracy | F1 Macro |
+|------|----------|----------|
+| Fold 1 | 96.06% | 95.78% |
+| Fold 2 | 95.52% | 95.18% |
+| Fold 3 | 94.98% | — |
+| Fold 4 | 95.14% | — |
+| **Fold 5 ✅ BEST** | **96.22%** | **96.00%** |
+
+### So sánh với model trước (single split)
+
+| | Single Split | **5-Fold (mới)** |
+|--|-------------|-----------------|
+| Accuracy | 94.52% | **95.58% ± 0.49%** |
+| F1 Macro | 94.38% | **95.22% ± 0.60%** |
+| Rhizoctonia Recall | 95.1% | 93.11% ± 1.61% |
+
+> **Dùng trong paper:** Accuracy=95.58%±0.49%, Macro F1=95.22%±0.60%, Rhizoctonia Recall=93.11%±1.61%
+
 ## Cấu trúc dự án / Project Structure
 ```
 durian_app/

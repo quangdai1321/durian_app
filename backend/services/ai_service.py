@@ -192,7 +192,7 @@ def load_model_on_startup():
                 else:
                     print(f"[AI] OK: Class names khop: {CLASS_NAMES}")
 
-            _model_version = f"YOLOv26n-CLS ({model_path.name})"
+            _model_version = f"YOLOv26n-CLS-5FoldCV ({model_path.name})"
             _model_loaded  = True
             print(f"[AI] OK: Model loaded thanh cong!")
             return
