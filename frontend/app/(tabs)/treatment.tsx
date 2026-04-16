@@ -196,17 +196,29 @@ function ReminderModal({
       Alert.alert("Thiếu thông tin", "Vui lòng chọn ngày và giờ.");
       return;
     }
-    // Validate time format
     if (!/^\d{2}:\d{2}$/.test(time)) {
       Alert.alert("Giờ không hợp lệ", "Nhập giờ theo định dạng HH:MM (ví dụ: 07:30)");
       return;
     }
-    // Validate date format
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       Alert.alert("Ngày không hợp lệ", "Nhập ngày theo định dạng YYYY-MM-DD (ví dụ: 2025-06-15)");
       return;
     }
 
+    // ── Confirm trước khi lưu ──
+    const repeatLabel  = REPEAT_OPTIONS.find(r => r.key === repeat)?.label ?? "";
+    const beforeLabel  = REMIND_BEFORE.find(r => r.key === remindBefore)?.label ?? "";
+    Alert.alert(
+      "Xác nhận lưu lịch nhắc?",
+      `${selectedTask.icon} ${selectedTask.label}\n📅 ${formatDateVN(date)} lúc ${time}\n🔁 ${repeatLabel}  🔔 ${beforeLabel}${customNote ? `\n📝 ${customNote}` : ""}`,
+      [
+        { text: "Huỷ", style: "cancel" },
+        { text: "✅ Lưu", style: "default", onPress: () => doSave() },
+      ]
+    );
+  }
+
+  async function doSave() {
     setSaving(true);
     const ok = await requestPermission();
     if (!ok && Platform.OS !== "web") {
@@ -378,24 +390,40 @@ function ReminderModal({
             </ScrollView>
 
             {/* Date picker trigger */}
-            <TouchableOpacity
-              style={ms.pickerTrigger}
-              onPress={() => {
-                if (Platform.OS === "web") return; // web dùng textinput bên dưới
-                setShowTimePicker(false);
-                setShowDatePicker(v => !v);
-              }}
-              activeOpacity={Platform.OS === "web" ? 1 : 0.7}
-            >
-              <Text style={ms.pickerTriggerIcon}>📅</Text>
-              <Text style={ms.pickerTriggerValue}>{formatDateVN(date)}</Text>
-              {Platform.OS !== "web" && (
+            {Platform.OS === "web" ? (
+              /* Web: hiển thị trigger + HTML input date bên dưới */
+              <>
+                <View style={ms.pickerTrigger} pointerEvents="none">
+                  <Text style={ms.pickerTriggerIcon}>📅</Text>
+                  <Text style={ms.pickerTriggerValue}>{formatDateVN(date)}</Text>
+                  <Text style={ms.pickerTriggerHint}>Nhấn để chọn ngày</Text>
+                </View>
+                {/* @ts-ignore – HTML input element on web */}
+                <input
+                  type="date"
+                  value={date}
+                  min={getDateStr(0)}
+                  onChange={(e: any) => setDate(e.target.value)}
+                  style={{
+                    marginTop: -48, height: 48, width: "100%", opacity: 0,
+                    cursor: "pointer", position: "relative", zIndex: 10,
+                  } as any}
+                />
+              </>
+            ) : (
+              /* Mobile: TouchableOpacity mở DateTimePicker */
+              <TouchableOpacity
+                style={ms.pickerTrigger}
+                onPress={() => { setShowTimePicker(false); setShowDatePicker(v => !v); }}
+              >
+                <Text style={ms.pickerTriggerIcon}>📅</Text>
+                <Text style={ms.pickerTriggerValue}>{formatDateVN(date)}</Text>
                 <Text style={ms.pickerTriggerHint}>Nhấn để chọn</Text>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
 
             {/* Native DatePicker (mobile) */}
-            {showDatePicker && DateTimePicker && (
+            {showDatePicker && DateTimePicker && Platform.OS !== "web" && (
               <DateTimePicker
                 value={pickerDate}
                 mode="date"
@@ -416,19 +444,6 @@ function ReminderModal({
               </TouchableOpacity>
             )}
 
-            {/* Web fallback — text input */}
-            {Platform.OS === "web" && (
-              <TextInput
-                style={ms.dateInput}
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD  ví dụ: 2025-06-20"
-                placeholderTextColor="#aaa"
-                keyboardType="numeric"
-                maxLength={10}
-              />
-            )}
-
             {/* ── Time ── */}
             <Text style={ms.fieldLabel}>Giờ thực hiện</Text>
 
@@ -446,24 +461,39 @@ function ReminderModal({
             </View>
 
             {/* Time picker trigger */}
-            <TouchableOpacity
-              style={ms.pickerTrigger}
-              onPress={() => {
-                if (Platform.OS === "web") return;
-                setShowDatePicker(false);
-                setShowTimePicker(v => !v);
-              }}
-              activeOpacity={Platform.OS === "web" ? 1 : 0.7}
-            >
-              <Text style={ms.pickerTriggerIcon}>🕐</Text>
-              <Text style={ms.pickerTriggerValue}>{time}</Text>
-              {Platform.OS !== "web" && (
+            {Platform.OS === "web" ? (
+              /* Web: hiển thị trigger + HTML input time bên dưới */
+              <>
+                <View style={ms.pickerTrigger} pointerEvents="none">
+                  <Text style={ms.pickerTriggerIcon}>🕐</Text>
+                  <Text style={ms.pickerTriggerValue}>{time}</Text>
+                  <Text style={ms.pickerTriggerHint}>Nhấn để chọn giờ</Text>
+                </View>
+                {/* @ts-ignore */}
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e: any) => setTime(e.target.value)}
+                  style={{
+                    marginTop: -48, height: 48, width: "100%", opacity: 0,
+                    cursor: "pointer", position: "relative", zIndex: 10,
+                  } as any}
+                />
+              </>
+            ) : (
+              /* Mobile: TouchableOpacity mở TimePicker */
+              <TouchableOpacity
+                style={ms.pickerTrigger}
+                onPress={() => { setShowDatePicker(false); setShowTimePicker(v => !v); }}
+              >
+                <Text style={ms.pickerTriggerIcon}>🕐</Text>
+                <Text style={ms.pickerTriggerValue}>{time}</Text>
                 <Text style={ms.pickerTriggerHint}>Nhấn để chọn</Text>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
 
             {/* Native TimePicker (mobile) */}
-            {showTimePicker && DateTimePicker && (
+            {showTimePicker && DateTimePicker && Platform.OS !== "web" && (
               <DateTimePicker
                 value={pickerDate}
                 mode="time"
@@ -482,19 +512,6 @@ function ReminderModal({
               <TouchableOpacity style={ms.pickerDoneBtn} onPress={() => setShowTimePicker(false)}>
                 <Text style={ms.pickerDoneBtnText}>Xong ✓</Text>
               </TouchableOpacity>
-            )}
-
-            {/* Web fallback — text input */}
-            {Platform.OS === "web" && (
-              <TextInput
-                style={ms.dateInput}
-                value={time}
-                onChangeText={setTime}
-                placeholder="HH:MM  ví dụ: 07:30"
-                placeholderTextColor="#aaa"
-                keyboardType="numeric"
-                maxLength={5}
-              />
             )}
 
             {/* Repeat */}
@@ -854,12 +871,25 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
       >
         {disease && (
           <>
-            {/* Hero card */}
+            {/* Hero card — tên bệnh hàng ngang để tiết kiệm diện tích */}
             <View style={styles.heroCard}>
               <View style={styles.heroLeft}>
-                <Text style={styles.diseaseName}>{disease.name_vi}</Text>
-                <Text style={styles.diseaseName2}>{disease.name_en}</Text>
-                {disease.scientific && <Text style={styles.sciName}>{disease.scientific}</Text>}
+                {/* Hàng ngang: Tên VN · Tên EN · Tên khoa học */}
+                <View style={styles.heroNameRow}>
+                  <Text style={styles.diseaseName}>{disease.name_vi}</Text>
+                  {disease.name_en && (
+                    <>
+                      <Text style={styles.heroSep}> · </Text>
+                      <Text style={styles.diseaseName2}>{disease.name_en}</Text>
+                    </>
+                  )}
+                  {disease.scientific && (
+                    <>
+                      <Text style={styles.heroSep}> · </Text>
+                      <Text style={styles.sciName}>{disease.scientific}</Text>
+                    </>
+                  )}
+                </View>
               </View>
               <View style={[styles.sevBadge, { backgroundColor: sev.bg }]}>
                 <Text style={[styles.sevText, { color: sev.color }]}>⚡ {sev.text}</Text>
@@ -1039,9 +1069,12 @@ const styles = StyleSheet.create({
     flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start",
   },
   heroLeft:    { flex: 1, marginRight: 10 },
-  diseaseName: { fontSize: 20, fontWeight: "800", color: Colors.primary },
-  diseaseName2:{ fontSize: 14, color: Colors.secondary, marginTop: 2 },
-  sciName:     { fontSize: 13, color: Colors.accent, fontStyle: "italic", marginTop: 4 },
+  // Tên bệnh hàng ngang
+  heroNameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 0 },
+  heroSep:     { fontSize: 14, color: Colors.border, fontWeight: "400" },
+  diseaseName: { fontSize: 17, fontWeight: "800", color: Colors.primary },
+  diseaseName2:{ fontSize: 13, color: Colors.secondary, fontWeight: "500" },
+  sciName:     { fontSize: 12, color: Colors.accent, fontStyle: "italic" },
   sevBadge:    { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   sevText:     { fontSize: 11, fontWeight: "700" },
   section:     { marginBottom: 18 },
