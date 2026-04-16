@@ -11,24 +11,58 @@
 
 ---
 
-## 🤖 AI Model — YOLOv26n-CLS 5-Fold Cross Validation
+## 🤖 AI Model — YOLOv26n-CLS (Giải Pháp 1 · 5-Fold CV)
 
 | Thông số | Giá trị |
 |----------|---------|
-| Kiến trúc | YOLOv26n Classification |
-| Phương pháp train | 5-Fold Cross Validation |
+| Kiến trúc | YOLOv26n Classification (Ultralytics ≥ 8.4.37) |
+| Phương pháp train | 5-Fold Stratified Cross-Validation |
 | Model được dùng | **Fold 5** (best fold) |
 | File | `backend/models/best.pt` (~3.2 MB) |
 
-### Kết quả 5-Fold CV (trung bình ± độ lệch chuẩn)
+### Cải tiến so với Baseline (Giải Pháp 1)
 
-| Metric | Giá trị |
-|--------|---------|
-| **Accuracy** | **95.58% ± 0.49%** |
-| **Macro F1** | **95.22% ± 0.60%** |
-| Rhizoctonia Recall | 93.11% ± 1.61% |
+| # | Cải tiến | Mục tiêu |
+|---|----------|----------|
+| 1a | **Focal Loss** (γ=2.0, α=class-balanced, label_smoothing=0.1) | Rhizoctonia recall ↑ |
+| 1b | **CutMix=0.5** + Mixup=0.15 + Mosaic + close_mosaic=10 | Blight/Colletotrichum confusion ↓ |
+| 1c | **5-Fold Cross-Validation** | Kết quả bền vững, mean±std |
 
-### Kết quả từng fold
+### Thống kê Dataset
+
+| Class | Train | Val | Test | Total |
+|-------|-------|-----|------|-------|
+| Leaf_Algal | 1243 | 210 | 283 | 1736 |
+| Leaf_Blight | 1390 | 225 | 319 | 1934 |
+| Leaf_Colletotrichum | 704 | 122 | 123 | 949 |
+| Leaf_Healthy | 1021 | 169 | 270 | 1460 |
+| Leaf_Phomopsis | 901 | 149 | 239 | 1289 |
+| **Leaf_Rhizoctonia** ⚠️ | 278 | 59 | 61 | 398 |
+
+> Imbalance ratio: **5.0×** (Blight/Rhizoctonia) → giải quyết bằng Focal Loss α=2.501 cho Rhizoctonia
+
+### So sánh 3 giai đoạn
+
+| Metric | Baseline | Giải Pháp 1 (single split) | **5-Fold CV (dùng trong app)** |
+|--------|----------|---------------------------|-------------------------------|
+| Accuracy | 94.71% | 94.52% | **95.58% ± 0.49%** |
+| Precision (macro) | 94.07% | 94.16% | **95.12% ± 0.54%** |
+| Recall (macro) | 94.05% | 94.64% | **95.36% ± 0.67%** |
+| F1 (macro) | 94.02% | 94.38% | **95.22% ± 0.60%** |
+| **Rhizoctonia Recall** | 88.3% ← yếu | **95.1%** (+6.8pp) | 93.11% ± 1.61% |
+
+### Per-class metrics — Giải Pháp 1 test set (n=1295)
+
+| Class | Precision | Recall | F1 | n |
+|-------|-----------|--------|----|---|
+| Leaf_Algal | 0.927 | 0.947 (+1.9pp) | 0.937 | 283 |
+| Leaf_Blight | 0.961 | 0.918 (+0.3pp) | 0.939 | 319 |
+| Leaf_Colletotrichum | 0.899 | 0.943 (-1.5pp) | 0.921 | 123 |
+| Leaf_Healthy | 0.974 | 0.981 (-1.1pp) | 0.978 | 270 |
+| Leaf_Phomopsis | 0.937 | 0.937 (-3.0pp) | 0.937 | 239 |
+| **Leaf_Rhizoctonia** ⭐ | **0.951** | **0.951 (+6.8pp)** | **0.951** | 61 |
+
+### Kết quả từng fold (5-Fold CV)
 
 | Fold | Accuracy | F1 Macro |
 |------|----------|----------|
@@ -38,15 +72,7 @@
 | Fold 4 | 95.14% | — |
 | **Fold 5 ✅ BEST** | **96.22%** | **96.00%** |
 
-### So sánh với model trước (single split)
-
-| | Single Split | **5-Fold (mới)** |
-|--|-------------|-----------------|
-| Accuracy | 94.52% | **95.58% ± 0.49%** |
-| F1 Macro | 94.38% | **95.22% ± 0.60%** |
-| Rhizoctonia Recall | 95.1% | 93.11% ± 1.61% |
-
-> **Dùng trong paper:** Accuracy=95.58%±0.49%, Macro F1=95.22%±0.60%, Rhizoctonia Recall=93.11%±1.61%
+> **Cite trong paper:** Accuracy=95.58%±0.49%, Macro F1=95.22%±0.60%, Rhizoctonia Recall=93.11%±1.61%
 
 ## Cấu trúc dự án / Project Structure
 ```
