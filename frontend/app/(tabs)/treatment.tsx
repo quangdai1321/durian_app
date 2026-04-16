@@ -626,12 +626,6 @@ function ReminderModal({
                       >
                         <Text style={ms.delBtnText}>🗑</Text>
                       </TouchableOpacity>
-                            ]);
-                          }
-                        }}
-                      >
-                        <Text style={ms.delBtnText}>🗑</Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 )}
