@@ -41,6 +41,8 @@ class DiseaseClass(Base):
     description_en = Column(UnicodeText)
     cause_vi       = Column(UnicodeText)
     cause_en       = Column(UnicodeText)
+    symptoms_vi    = Column(UnicodeText)
+    season_vi      = Column(UnicodeText)
     created_at     = Column(DateTime(timezone=True), default=datetime.utcnow)
     steps          = relationship("TreatmentStep", back_populates="disease", order_by="TreatmentStep.step_order")
 

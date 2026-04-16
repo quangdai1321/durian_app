@@ -366,14 +366,41 @@ export default function ResultScreen() {
             </View>
           )}
 
-          {/* ── Cause ── */}
-          {disease?.cause_vi && (
+          {/* ── Disease detail card ── */}
+          {!isHealthy && (disease?.description_vi || disease?.symptoms_vi || disease?.cause_vi || disease?.season_vi) && (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardHeaderIcon}>🔬</Text>
-                <Text style={styles.cardTitle}>Nguyên nhân</Text>
+                <Text style={styles.cardHeaderIcon}>📋</Text>
+                <Text style={styles.cardTitle}>Thông tin bệnh</Text>
               </View>
-              <Text style={styles.causeText}>{disease.cause_vi}</Text>
+
+              {disease?.description_vi && (
+                <View style={styles.diseaseSection}>
+                  <Text style={styles.diseaseSectionLabel}>📌 Mô tả</Text>
+                  <Text style={styles.diseaseSectionText}>{disease.description_vi}</Text>
+                </View>
+              )}
+
+              {disease?.symptoms_vi && (
+                <View style={styles.diseaseSection}>
+                  <Text style={styles.diseaseSectionLabel}>🔍 Biểu hiện</Text>
+                  <Text style={styles.diseaseSectionText}>{disease.symptoms_vi}</Text>
+                </View>
+              )}
+
+              {disease?.cause_vi && (
+                <View style={styles.diseaseSection}>
+                  <Text style={styles.diseaseSectionLabel}>🔬 Nguyên nhân</Text>
+                  <Text style={styles.diseaseSectionText}>{disease.cause_vi}</Text>
+                </View>
+              )}
+
+              {disease?.season_vi && (
+                <View style={[styles.diseaseSection, styles.diseaseSectionLast]}>
+                  <Text style={styles.diseaseSectionLabel}>📅 Thời điểm phát sinh</Text>
+                  <Text style={styles.diseaseSectionText}>{disease.season_vi}</Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -604,7 +631,23 @@ const styles = StyleSheet.create({
   top3Track:   { height: 4, backgroundColor: "#f0f0f0", borderRadius: 2, overflow: "hidden" },
   top3Fill:    { height: 4, borderRadius: 2 },
 
-  // Cause
+  // Disease detail sections
+  diseaseSection: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f4f0",
+  },
+  diseaseSectionLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 2,
+  },
+  diseaseSectionLabel: {
+    fontSize: 12, fontWeight: "800", color: Colors.primary,
+    marginBottom: 5, letterSpacing: 0.3,
+  },
+  diseaseSectionText: { fontSize: 13, color: Colors.text, lineHeight: 21 },
+
+  // Cause (legacy — kept for safety)
   causeText: { fontSize: 13, color: Colors.text, lineHeight: 21 },
 
   // OOD warning

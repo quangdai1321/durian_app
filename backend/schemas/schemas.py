@@ -60,6 +60,8 @@ class DiseaseOut(BaseModel):
     severity:       str
     cause_vi:       Optional[str]
     cause_en:       Optional[str]
+    symptoms_vi:    Optional[str] = None
+    season_vi:      Optional[str] = None
     steps:          List[TreatmentStepOut] = []
     model_config = {"from_attributes": True}
 

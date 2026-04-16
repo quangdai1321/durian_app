@@ -30,6 +30,9 @@ async def _migrate_add_columns(conn):
         "ALTER TABLE diagnoses ADD COLUMN IF NOT EXISTS image_data TEXT",
         # Thêm cột avatar_data vào users để lưu avatar base64 persistent
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data TEXT",
+        # Thêm cột symptoms_vi, season_vi vào disease_classes
+        "ALTER TABLE disease_classes ADD COLUMN IF NOT EXISTS symptoms_vi TEXT",
+        "ALTER TABLE disease_classes ADD COLUMN IF NOT EXISTS season_vi TEXT",
     ]
     for sql in migrations:
         try:
