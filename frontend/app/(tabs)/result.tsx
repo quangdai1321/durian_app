@@ -59,8 +59,19 @@ export default function ResultScreen() {
     slideAnim.setValue(30);
     barAnim.setValue(0);
 
-    AsyncStorage.getItem("last_diagnosis").then(raw => {
-      if (raw) setDiagnosis(JSON.parse(raw));
+    AsyncStorage.getItem("last_diagnosis").then(async raw => {
+      if (raw) {
+        const diag = JSON.parse(raw);
+        setDiagnosis(diag);
+        // Kiểm tra đã từng báo sai diagnosis này chưa
+        if (diag?.id) {
+          const stored = await AsyncStorage.getItem(`correction_${diag.id}`);
+          if (stored) {
+            setCorrectClass(stored);
+            setFeedbackSubmitted(true);
+          }
+        }
+      }
       setLoading(false);
     });
   }, []));
@@ -85,6 +96,8 @@ export default function ResultScreen() {
         rating: 1,
         comment: "User correction via app",
       });
+      // Lưu vào AsyncStorage để giữ trạng thái khi xem lại từ lịch sử
+      await AsyncStorage.setItem(`correction_${diagnosis.id}`, cls);
       setFeedbackSubmitted(true);
       setShowCorrect(false);
     } catch {
