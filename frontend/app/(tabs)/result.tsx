@@ -39,6 +39,11 @@ export default function ResultScreen() {
   const [loading,   setLoading]   = useState(true);
   const [rating,    setRating]    = useState(0);
 
+  const [showCorrect,       setShowCorrect]       = useState(false);
+  const [correctClass,      setCorrectClass]       = useState<string | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted]  = useState(false);
+  const [submittingFb,      setSubmittingFb]       = useState(false);
+
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const barAnim   = useRef(new Animated.Value(0)).current;
@@ -46,6 +51,10 @@ export default function ResultScreen() {
   useFocusEffect(useCallback(() => {
     setLoading(true);
     setRating(0);
+    setShowCorrect(false);
+    setCorrectClass(null);
+    setFeedbackSubmitted(false);
+    setSubmittingFb(false);
     fadeAnim.setValue(0);
     slideAnim.setValue(30);
     barAnim.setValue(0);
@@ -65,6 +74,25 @@ export default function ResultScreen() {
       Animated.timing(barAnim,   { toValue: conf / 100, duration: 800, delay: 200, useNativeDriver: false }),
     ]).start();
   }, [diagnosis]);
+
+  const submitCorrection = async (cls: string) => {
+    if (!diagnosis?.id || submittingFb) return;
+    setCorrectClass(cls);
+    setSubmittingFb(true);
+    try {
+      await diagnosisApi.feedback(diagnosis.id, {
+        actual_class: cls,
+        rating: 1,
+        comment: "User correction via app",
+      });
+      setFeedbackSubmitted(true);
+      setShowCorrect(false);
+    } catch {
+      setCorrectClass(null);
+    } finally {
+      setSubmittingFb(false);
+    }
+  };
 
   const submitFeedback = async (r: number) => {
     if (!diagnosis) return;
@@ -264,6 +292,26 @@ export default function ResultScreen() {
             </View>
           )}
 
+          {/* ── Top-2 confusion warning ── */}
+          {(() => {
+            const top3 = diagnosis.top3_predictions;
+            if (!top3 || top3.length < 2) return null;
+            const gap = (top3[0].confidence - top3[1].confidence) * 100;
+            if (gap >= 15) return null;
+            return (
+              <View style={styles.confusionBox}>
+                <Text style={styles.confusionIcon}>🤔</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.confusionTitle}>Kết quả khó phân biệt</Text>
+                  <Text style={styles.confusionDesc}>
+                    Chênh lệch với "{LABEL_VI[top3[1].class] ?? top3[1].class}" chỉ {gap.toFixed(1)}%.
+                    Nên kiểm tra thêm hoặc tham khảo chuyên gia.
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
+
           {/* ── Cause ── */}
           {disease?.cause_vi && (
             <View style={styles.card}>
@@ -332,6 +380,60 @@ export default function ResultScreen() {
               </Text>
             )}
           </View>
+
+          {/* ── Báo nhận diện sai ── */}
+          {!isHealthy && (
+            <View style={styles.correctCard}>
+              {feedbackSubmitted ? (
+                <View style={styles.correctDone}>
+                  <Text style={styles.correctDoneIcon}>✅</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.correctDoneTitle}>Cảm ơn bạn đã đính chính!</Text>
+                    <Text style={styles.correctDoneDesc}>
+                      Nhãn "{LABEL_VI[correctClass!] ?? correctClass}" đã được ghi nhận để cải thiện model.
+                    </Text>
+                  </View>
+                </View>
+              ) : showCorrect ? (
+                <>
+                  <Text style={styles.correctTitle}>Chọn bệnh đúng:</Text>
+                  <View style={styles.correctGrid}>
+                    {Object.entries(LABEL_VI)
+                      .filter(([k]) => k !== "Leaf_Healthy" && k !== cls)
+                      .map(([k, v]) => (
+                        <TouchableOpacity
+                          key={k}
+                          style={[styles.correctChip, correctClass === k && styles.correctChipActive, submittingFb && { opacity: 0.5 }]}
+                          onPress={() => submitCorrection(k)}
+                          disabled={submittingFb}
+                        >
+                          <Text style={styles.correctChipIcon}>{DISEASE_ICON[k]}</Text>
+                          <Text style={[styles.correctChipText, correctClass === k && styles.correctChipTextActive]}>
+                            {v.replace(/\(.*\)/, "").trim()}
+                          </Text>
+                          {submittingFb && correctClass === k && (
+                            <ActivityIndicator size="small" color="#fff" style={{ marginLeft: 4 }} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                  </View>
+                  <TouchableOpacity onPress={() => setShowCorrect(false)} style={styles.correctCancelBtn}>
+                    <Text style={styles.correctCancelText}>Huỷ</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.correctRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.correctRowTitle}>Nhận diện chưa đúng?</Text>
+                    <Text style={styles.correctRowSub}>Đính chính giúp model học thông minh hơn</Text>
+                  </View>
+                  <TouchableOpacity style={styles.correctBtn} onPress={() => setShowCorrect(true)}>
+                    <Text style={styles.correctBtnText}>✏️ Sai rồi</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={{ height: 32 }} />
         </Animated.View>
@@ -557,4 +659,47 @@ const styles = StyleSheet.create({
   star:           { fontSize: 32, color: "#d0d0d0" },
   starActive:     { color: "#f5a623" },
   ratingThanks:   { marginTop: 10, fontSize: 13, color: Colors.textMuted },
+
+  // Top-2 confusion warning
+  confusionBox: {
+    flexDirection: "row", gap: 10, alignItems: "flex-start",
+    backgroundColor: "#fff8e1", borderRadius: 14, borderWidth: 1.5,
+    borderColor: "#ffca28", padding: 12, marginBottom: 10,
+  },
+  confusionIcon:  { fontSize: 20, marginTop: 1 },
+  confusionTitle: { fontSize: 13, fontWeight: "800", color: "#e65100", marginBottom: 3 },
+  confusionDesc:  { fontSize: 12, color: "#bf360c", lineHeight: 18 },
+
+  // Correction card
+  correctCard: {
+    backgroundColor: "#fff", borderRadius: 20, padding: 16, marginBottom: 10,
+    borderWidth: 1.5, borderColor: "#e8f5e9",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07, shadowRadius: 10, elevation: 4,
+  },
+  correctRow:       { flexDirection: "row", alignItems: "center", gap: 12 },
+  correctRowTitle:  { fontSize: 14, fontWeight: "800", color: Colors.text, marginBottom: 2 },
+  correctRowSub:    { fontSize: 11, color: Colors.textMuted, lineHeight: 16 },
+  correctBtn: {
+    backgroundColor: "#fff3e0", borderRadius: 12, paddingVertical: 10,
+    paddingHorizontal: 16, borderWidth: 1.5, borderColor: "#ff9800",
+  },
+  correctBtnText:  { color: "#e65100", fontWeight: "800", fontSize: 13 },
+  correctTitle:    { fontSize: 13, fontWeight: "800", color: Colors.text, marginBottom: 10 },
+  correctGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  correctChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.bg,
+  },
+  correctChipActive:     { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  correctChipIcon:       { fontSize: 14 },
+  correctChipText:       { fontSize: 12, color: Colors.textMuted, fontWeight: "600" },
+  correctChipTextActive: { color: "#fff" },
+  correctCancelBtn: { alignSelf: "flex-start", paddingVertical: 4, paddingHorizontal: 8 },
+  correctCancelText: { fontSize: 12, color: Colors.textMuted },
+  correctDone: { flexDirection: "row", alignItems: "center", gap: 12 },
+  correctDoneIcon:  { fontSize: 28 },
+  correctDoneTitle: { fontSize: 14, fontWeight: "800", color: "#2e7d32", marginBottom: 3 },
+  correctDoneDesc:  { fontSize: 12, color: Colors.textMuted, lineHeight: 17 },
 });
