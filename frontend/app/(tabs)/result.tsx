@@ -312,6 +312,60 @@ export default function ResultScreen() {
             );
           })()}
 
+          {/* ── Báo nhận diện sai ── */}
+          {!isHealthy && (
+            <View style={styles.correctCard}>
+              {feedbackSubmitted ? (
+                <View style={styles.correctDone}>
+                  <Text style={styles.correctDoneIcon}>✅</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.correctDoneTitle}>Cảm ơn bạn đã đính chính!</Text>
+                    <Text style={styles.correctDoneDesc}>
+                      Nhãn "{LABEL_VI[correctClass!] ?? correctClass}" đã được ghi nhận để cải thiện model.
+                    </Text>
+                  </View>
+                </View>
+              ) : showCorrect ? (
+                <>
+                  <Text style={styles.correctTitle}>Chọn bệnh đúng:</Text>
+                  <View style={styles.correctGrid}>
+                    {Object.entries(LABEL_VI)
+                      .filter(([k]) => k !== "Leaf_Healthy" && k !== cls)
+                      .map(([k, v]) => (
+                        <TouchableOpacity
+                          key={k}
+                          style={[styles.correctChip, correctClass === k && styles.correctChipActive, submittingFb && { opacity: 0.5 }]}
+                          onPress={() => submitCorrection(k)}
+                          disabled={submittingFb}
+                        >
+                          <Text style={styles.correctChipIcon}>{DISEASE_ICON[k]}</Text>
+                          <Text style={[styles.correctChipText, correctClass === k && styles.correctChipTextActive]}>
+                            {v.replace(/\(.*\)/, "").trim()}
+                          </Text>
+                          {submittingFb && correctClass === k && (
+                            <ActivityIndicator size="small" color="#fff" style={{ marginLeft: 4 }} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                  </View>
+                  <TouchableOpacity onPress={() => setShowCorrect(false)} style={styles.correctCancelBtn}>
+                    <Text style={styles.correctCancelText}>Huỷ</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.correctRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.correctRowTitle}>Nhận diện chưa đúng?</Text>
+                    <Text style={styles.correctRowSub}>Đính chính giúp model học thông minh hơn</Text>
+                  </View>
+                  <TouchableOpacity style={styles.correctBtn} onPress={() => setShowCorrect(true)}>
+                    <Text style={styles.correctBtnText}>✏️ Sai rồi</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* ── Cause ── */}
           {disease?.cause_vi && (
             <View style={styles.card}>
@@ -380,60 +434,6 @@ export default function ResultScreen() {
               </Text>
             )}
           </View>
-
-          {/* ── Báo nhận diện sai ── */}
-          {!isHealthy && (
-            <View style={styles.correctCard}>
-              {feedbackSubmitted ? (
-                <View style={styles.correctDone}>
-                  <Text style={styles.correctDoneIcon}>✅</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.correctDoneTitle}>Cảm ơn bạn đã đính chính!</Text>
-                    <Text style={styles.correctDoneDesc}>
-                      Nhãn "{LABEL_VI[correctClass!] ?? correctClass}" đã được ghi nhận để cải thiện model.
-                    </Text>
-                  </View>
-                </View>
-              ) : showCorrect ? (
-                <>
-                  <Text style={styles.correctTitle}>Chọn bệnh đúng:</Text>
-                  <View style={styles.correctGrid}>
-                    {Object.entries(LABEL_VI)
-                      .filter(([k]) => k !== "Leaf_Healthy" && k !== cls)
-                      .map(([k, v]) => (
-                        <TouchableOpacity
-                          key={k}
-                          style={[styles.correctChip, correctClass === k && styles.correctChipActive, submittingFb && { opacity: 0.5 }]}
-                          onPress={() => submitCorrection(k)}
-                          disabled={submittingFb}
-                        >
-                          <Text style={styles.correctChipIcon}>{DISEASE_ICON[k]}</Text>
-                          <Text style={[styles.correctChipText, correctClass === k && styles.correctChipTextActive]}>
-                            {v.replace(/\(.*\)/, "").trim()}
-                          </Text>
-                          {submittingFb && correctClass === k && (
-                            <ActivityIndicator size="small" color="#fff" style={{ marginLeft: 4 }} />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                  </View>
-                  <TouchableOpacity onPress={() => setShowCorrect(false)} style={styles.correctCancelBtn}>
-                    <Text style={styles.correctCancelText}>Huỷ</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <View style={styles.correctRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.correctRowTitle}>Nhận diện chưa đúng?</Text>
-                    <Text style={styles.correctRowSub}>Đính chính giúp model học thông minh hơn</Text>
-                  </View>
-                  <TouchableOpacity style={styles.correctBtn} onPress={() => setShowCorrect(true)}>
-                    <Text style={styles.correctBtnText}>✏️ Sai rồi</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
 
           <View style={{ height: 32 }} />
         </Animated.View>
