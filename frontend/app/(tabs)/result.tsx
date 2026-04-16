@@ -24,12 +24,12 @@ const LABEL_VI: Record<string, string> = {
 };
 
 const DISEASE_ICON: Record<string, string> = {
-  Leaf_Algal:          "🌊",
-  Leaf_Blight:         "🔥",
-  Leaf_Colletotrichum: "🍄",
-  Leaf_Healthy:        "✅",
-  Leaf_Phomopsis:      "⚠️",
-  Leaf_Rhizoctonia:    "🌑",
+  Leaf_Algal:          "🔵",   // đốm tảo — màu xanh/tảo
+  Leaf_Blight:         "🔥",   // cháy lá — lửa
+  Leaf_Colletotrichum: "🍂",   // thán thư — đốm nâu, lá chết
+  Leaf_Healthy:        "✅",   // khỏe mạnh
+  Leaf_Phomopsis:      "🌿",   // khô đầu lá — lá héo
+  Leaf_Rhizoctonia:    "🟤",   // lở cổ rễ — màu nâu đất
 };
 
 export default function ResultScreen() {
