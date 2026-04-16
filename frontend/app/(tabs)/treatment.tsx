@@ -117,6 +117,11 @@ function ReminderModal({
   const [repeat,       setRepeat]       = useState("none");
   const [remindBefore, setRemindBefore] = useState("30");
   const [saving,       setSaving]       = useState(false);
+  const [formError,    setFormError]    = useState("");
+
+  // Inline confirm states — không dùng window.confirm hay Alert (bị block trên web)
+  const [confirmSave,     setConfirmSave]     = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // DateTimePicker state (mobile only)
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -137,17 +142,17 @@ function ReminderModal({
   const loadReminders = useCallback(async () => {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (raw) setReminders(JSON.parse(raw));
+      setReminders(raw ? JSON.parse(raw) : []);
     } catch {}
   }, []);
 
-  useEffect(() => { if (visible) loadReminders(); }, [visible]);
+  useEffect(() => { if (visible) { loadReminders(); setTab("create"); } }, [visible]);
 
   const selectedTask = TASK_TYPES.find(t => t.key === taskKey)!;
 
-  // ── request permission ───────────────────────────────────────
+  // ── request notification permission ─────────────────────────
   async function requestPermission() {
-    if (!Notifications) return true; // web — skip
+    if (!Notifications) return true;
     const { status: existing } = await Notifications.getPermissionsAsync();
     if (existing === "granted") return true;
     const { status } = await Notifications.requestPermissionsAsync();
@@ -155,80 +160,47 @@ function ReminderModal({
   }
 
   // ── schedule local notification ──────────────────────────────
-  async function scheduleNotification(reminder: Reminder): Promise<string | undefined> {
+  async function scheduleNotification(r: Reminder): Promise<string | undefined> {
     if (!Notifications) return undefined;
-
-    const [y, mo, d] = reminder.date.split("-").map(Number);
-    const [h, mi]    = reminder.time.split(":").map(Number);
+    const [y, mo, d] = r.date.split("-").map(Number);
+    const [h, mi]    = r.time.split(":").map(Number);
     const fireDate   = new Date(y, mo - 1, d, h, mi, 0);
-    const offsetMs   = parseInt(reminder.remindBefore) * 60 * 1000;
+    const offsetMs   = parseInt(r.remindBefore) * 60 * 1000;
     const triggerMs  = fireDate.getTime() - offsetMs - Date.now();
-
-    if (triggerMs <= 0) return undefined; // Thời điểm đã qua
-
-    const triggerObj: any = repeat === "none"
+    if (triggerMs <= 0) return undefined;
+    const triggerObj: any = r.repeat === "none"
       ? { seconds: Math.floor(triggerMs / 1000) }
-      : repeat === "daily"
-        ? { hour: h, minute: mi, repeats: true }
-        : repeat === "weekly"
-          ? { weekday: fireDate.getDay() + 1, hour: h, minute: mi, repeats: true }
-          : { day: d, hour: h, minute: mi, repeats: true };
-
+      : r.repeat === "daily"   ? { hour: h, minute: mi, repeats: true }
+      : r.repeat === "weekly"  ? { weekday: fireDate.getDay() + 1, hour: h, minute: mi, repeats: true }
+      : { day: d, hour: h, minute: mi, repeats: true };
     try {
       return await Notifications.scheduleNotificationAsync({
         content: {
-          title: `${reminder.taskIcon} ${reminder.taskLabel}`,
-          body: reminder.customNote
-            ? `📌 ${reminder.customNote}\n📅 ${formatDateVN(reminder.date)} ${reminder.time}`
-            : `📅 ${formatDateVN(reminder.date)} lúc ${reminder.time}`,
+          title: `${r.taskIcon} ${r.taskLabel}`,
+          body: r.customNote
+            ? `📌 ${r.customNote}\n📅 ${formatDateVN(r.date)} ${r.time}`
+            : `📅 ${formatDateVN(r.date)} lúc ${r.time}`,
           sound: true,
         },
         trigger: triggerObj,
       });
-    } catch (e) {
-      console.warn("Notification schedule failed:", e);
-      return undefined;
-    }
+    } catch { return undefined; }
   }
 
-  // ── save reminder ────────────────────────────────────────────
-  async function handleSave() {
-    if (!date || !time) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn ngày và giờ.");
-      return;
-    }
-    if (!/^\d{2}:\d{2}$/.test(time)) {
-      Alert.alert("Giờ không hợp lệ", "Nhập giờ theo định dạng HH:MM (ví dụ: 07:30)");
-      return;
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      Alert.alert("Ngày không hợp lệ", "Nhập ngày theo định dạng YYYY-MM-DD (ví dụ: 2025-06-15)");
-      return;
-    }
-
-    // ── Confirm trước khi lưu ──
-    const repeatLabel = REPEAT_OPTIONS.find(r => r.key === repeat)?.label ?? "";
-    const beforeLabel = REMIND_BEFORE.find(r => r.key === remindBefore)?.label ?? "";
-    const msg = `${selectedTask.icon} ${selectedTask.label}\n📅 ${formatDateVN(date)} lúc ${time}\n🔁 ${repeatLabel}  🔔 ${beforeLabel}${customNote ? `\n📝 ${customNote}` : ""}`;
-
-    if (Platform.OS === "web") {
-      // Web: dùng window.confirm (synchronous, không cần callback)
-      const ok = (globalThis as any).confirm?.(`Xác nhận lưu lịch nhắc?\n\n${msg}`);
-      if (ok) doSave();
-    } else {
-      Alert.alert("Xác nhận lưu lịch nhắc?", msg, [
-        { text: "Huỷ", style: "cancel" },
-        { text: "✅ Lưu", onPress: () => doSave() },
-      ]);
-    }
+  // ── validate → show inline confirm ──────────────────────────
+  function handleSavePress() {
+    setFormError("");
+    if (!date || !time) { setFormError("Vui lòng chọn ngày và giờ."); return; }
+    if (!/^\d{2}:\d{2}$/.test(time)) { setFormError("Giờ không hợp lệ. Dùng định dạng HH:MM (vd: 07:30)"); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setFormError("Ngày không hợp lệ. Dùng YYYY-MM-DD (vd: 2025-06-20)"); return; }
+    setConfirmSave(true); // Hiện inline confirm — không dùng dialog
   }
 
+  // ── thực sự lưu sau khi confirm ──────────────────────────────
   async function doSave() {
+    setConfirmSave(false);
     setSaving(true);
-    const ok = await requestPermission();
-    if (!ok && Platform.OS !== "web") {
-      Alert.alert("Cần quyền thông báo", "Vui lòng bật quyền thông báo trong cài đặt điện thoại để nhận nhắc lịch.");
-    }
+    await requestPermission();
 
     const reminder: Reminder = {
       id: Date.now().toString(),
@@ -248,54 +220,52 @@ function ReminderModal({
     if (notifId) reminder.notifId = notifId;
 
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw  = await AsyncStorage.getItem(STORAGE_KEY);
       const list: Reminder[] = raw ? JSON.parse(raw) : [];
       list.unshift(reminder);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
       setReminders(list);
-    } catch {}
+    } catch (e) {
+      console.warn("AsyncStorage save error:", e);
+    }
 
     setSaving(false);
-    // Reset form
     setCustomNote("");
     setDate(getDateStr(0));
     setRepeat("none");
-    setTab("list");
-
-    Alert.alert(
-      "✅ Đã lưu lịch nhắc",
-      Platform.OS === "web"
-        ? `${selectedTask.icon} ${selectedTask.label}\n📅 ${formatDateVN(date)} lúc ${time}\n\n(Thông báo chỉ hoạt động trên điện thoại)`
-        : `${selectedTask.icon} ${selectedTask.label}\n📅 ${formatDateVN(date)} lúc ${time}${notifId ? "\n🔔 Đã lên lịch thông báo!" : "\n⚠️ Đặt lịch thông báo thất bại (thời gian đã qua?)"}`,
-      [{ text: "OK" }]
-    );
+    setFormError("");
+    setTab("list"); // Chuyển sang tab list sau khi lưu thành công
   }
 
-  // ── delete reminder ──────────────────────────────────────────
-  async function handleDelete(id: string) {
+  // ── xoá reminder ─────────────────────────────────────────────
+  async function doDelete(id: string) {
+    setConfirmDeleteId(null);
     const item = reminders.find(r => r.id === id);
     if (item?.notifId && Notifications) {
       try { await Notifications.cancelScheduledNotificationAsync(item.notifId); } catch {}
     }
     const next = reminders.filter(r => r.id !== id);
     setReminders(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.warn("AsyncStorage delete error:", e);
+    }
   }
 
-  // ── mark done ────────────────────────────────────────────────
+  // ── đánh dấu hoàn thành ──────────────────────────────────────
   async function handleToggleDone(id: string) {
     const next = reminders.map(r => r.id === id ? { ...r, done: !r.done } : r);
     setReminders(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
   }
 
-  // ── date quick buttons ───────────────────────────────────────
   const DATE_QUICK = [
-    { label: "Hôm nay",   offset: 0 },
-    { label: "Ngày mai",  offset: 1 },
-    { label: "+3 ngày",   offset: 3 },
-    { label: "+7 ngày",   offset: 7 },
-    { label: "+14 ngày",  offset: 14 },
+    { label: "Hôm nay",  offset: 0 },
+    { label: "Ngày mai", offset: 1 },
+    { label: "+3 ngày",  offset: 3 },
+    { label: "+7 ngày",  offset: 7 },
+    { label: "+14 ngày", offset: 14 },
   ];
 
   return (
@@ -319,11 +289,9 @@ function ReminderModal({
         <View style={ms.tabBar}>
           <TouchableOpacity
             style={[ms.tabBtn, tab === "create" && ms.tabBtnActive]}
-            onPress={() => setTab("create")}
+            onPress={() => { setTab("create"); setConfirmSave(false); }}
           >
-            <Text style={[ms.tabBtnText, tab === "create" && ms.tabBtnTextActive]}>
-              ➕ Tạo lịch
-            </Text>
+            <Text style={[ms.tabBtnText, tab === "create" && ms.tabBtnTextActive]}>➕ Tạo lịch</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[ms.tabBtn, tab === "list" && ms.tabBtnActive]}
@@ -339,7 +307,7 @@ function ReminderModal({
         {tab === "create" && (
           <ScrollView style={ms.formScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-            {/* Task type */}
+            {/* Task type grid */}
             <Text style={ms.fieldLabel}>Loại công việc</Text>
             <View style={ms.taskGrid}>
               {TASK_TYPES.map(t => (
@@ -356,7 +324,7 @@ function ReminderModal({
               ))}
             </View>
 
-            {/* Custom note (always visible, required for "Khác") */}
+            {/* Ghi chú */}
             <Text style={ms.fieldLabel}>
               {taskKey === "khac" ? "Nội dung công việc *" : "Ghi chú thêm (tuỳ chọn)"}
             </Text>
@@ -366,14 +334,11 @@ function ReminderModal({
               onChangeText={setCustomNote}
               placeholder={taskKey === "khac" ? "Nhập nội dung công việc..." : "Ví dụ: Khu vực vườn A, liều lượng..."}
               placeholderTextColor="#aaa"
-              multiline
-              maxLength={200}
+              multiline maxLength={200}
             />
 
-            {/* ── Date ── */}
+            {/* ── Ngày thực hiện ── */}
             <Text style={ms.fieldLabel}>Ngày thực hiện</Text>
-
-            {/* Quick date chips */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ms.quickDateRow}>
               {DATE_QUICK.map(q => {
                 const d = getDateStr(q.offset);
@@ -381,56 +346,40 @@ function ReminderModal({
                   <TouchableOpacity
                     key={q.offset}
                     style={[ms.quickDateBtn, date === d && ms.quickDateBtnActive]}
-                    onPress={() => setDate(d)}
+                    onPress={() => { setDate(d); setShowDatePicker(false); }}
                   >
-                    <Text style={[ms.quickDateBtnText, date === d && ms.quickDateBtnTextActive]}>
-                      {q.label}
-                    </Text>
-                    <Text style={[ms.quickDateSub, date === d && { color: "#fff" }]}>
-                      {formatDateVN(d)}
-                    </Text>
+                    <Text style={[ms.quickDateBtnText, date === d && ms.quickDateBtnTextActive]}>{q.label}</Text>
+                    <Text style={[ms.quickDateSub, date === d && { color: "#fff" }]}>{formatDateVN(d)}</Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
 
-            {/* Date picker trigger */}
-            {Platform.OS === "web" ? (
-              /* Web: TextInput với type="date" — React Native Web render thành <input type="date"> */
-              <View style={ms.pickerTrigger}>
-                <Text style={ms.pickerTriggerIcon}>📅</Text>
-                <TextInput
-                  {...({ type: "date", min: getDateStr(0) } as any)}
-                  value={date}
-                  onChangeText={setDate}
-                  style={[ms.pickerTriggerValue, ms.webDateInput]}
-                />
-                <Text style={ms.pickerTriggerHint}>Chọn ngày</Text>
-              </View>
-            ) : (
-              /* Mobile: TouchableOpacity mở DateTimePicker */
-              <TouchableOpacity
-                style={ms.pickerTrigger}
-                onPress={() => { setShowTimePicker(false); setShowDatePicker(v => !v); }}
-              >
-                <Text style={ms.pickerTriggerIcon}>📅</Text>
-                <Text style={ms.pickerTriggerValue}>{formatDateVN(date)}</Text>
-                <Text style={ms.pickerTriggerHint}>Nhấn để chọn</Text>
-              </TouchableOpacity>
-            )}
+            {/* Hiển thị ngày đã chọn + nút mở picker (mobile) */}
+            <TouchableOpacity
+              style={ms.pickerTrigger}
+              onPress={() => {
+                if (Platform.OS !== "web") { setShowTimePicker(false); setShowDatePicker(v => !v); }
+              }}
+              activeOpacity={Platform.OS === "web" ? 1 : 0.7}
+            >
+              <Text style={ms.pickerTriggerIcon}>📅</Text>
+              <Text style={ms.pickerTriggerValue}>{formatDateVN(date) || date}</Text>
+              {Platform.OS !== "web"
+                ? <Text style={ms.pickerTriggerHint}>Nhấn để chọn</Text>
+                : <Text style={ms.pickerTriggerHint}>Dùng các nút trên hoặc nhập thủ công</Text>
+              }
+            </TouchableOpacity>
 
-            {/* Native DatePicker (mobile) */}
+            {/* Mobile DatePicker */}
             {showDatePicker && DateTimePicker && Platform.OS !== "web" && (
               <DateTimePicker
-                value={pickerDate}
-                mode="date"
+                value={pickerDate} mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 minimumDate={new Date()}
-                onChange={(_: any, selected?: Date) => {
+                onChange={(_: any, sel?: Date) => {
                   if (Platform.OS === "android") setShowDatePicker(false);
-                  if (selected) {
-                    setDate(`${selected.getFullYear()}-${pad2(selected.getMonth()+1)}-${pad2(selected.getDate())}`);
-                  }
+                  if (sel) setDate(`${sel.getFullYear()}-${pad2(sel.getMonth()+1)}-${pad2(sel.getDate())}`);
                 }}
                 style={ms.nativePicker}
               />
@@ -441,59 +390,56 @@ function ReminderModal({
               </TouchableOpacity>
             )}
 
-            {/* ── Time ── */}
-            <Text style={ms.fieldLabel}>Giờ thực hiện</Text>
+            {/* Web: manual text input date */}
+            {Platform.OS === "web" && (
+              <TextInput
+                style={ms.dateInput}
+                value={date}
+                onChangeText={v => setDate(v.replace(/[^\d-]/g, "").slice(0, 10))}
+                placeholder="YYYY-MM-DD  (vd: 2026-06-20)"
+                placeholderTextColor="#aaa"
+                maxLength={10}
+              />
+            )}
 
-            {/* Quick time chips */}
+            {/* ── Giờ thực hiện ── */}
+            <Text style={ms.fieldLabel}>Giờ thực hiện</Text>
             <View style={ms.timeRow}>
               {["06:00","07:30","09:00","14:00","16:00","18:00"].map(t => (
                 <TouchableOpacity
                   key={t}
                   style={[ms.timeChip, time === t && ms.timeChipActive]}
-                  onPress={() => setTime(t)}
+                  onPress={() => { setTime(t); setShowTimePicker(false); }}
                 >
                   <Text style={[ms.timeChipText, time === t && ms.timeChipTextActive]}>{t}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* Time picker trigger */}
-            {Platform.OS === "web" ? (
-              /* Web: TextInput với type="time" — React Native Web render thành <input type="time"> */
-              <View style={ms.pickerTrigger}>
-                <Text style={ms.pickerTriggerIcon}>🕐</Text>
-                <TextInput
-                  {...({ type: "time" } as any)}
-                  value={time}
-                  onChangeText={setTime}
-                  style={[ms.pickerTriggerValue, ms.webDateInput]}
-                />
-                <Text style={ms.pickerTriggerHint}>Chọn giờ</Text>
-              </View>
-            ) : (
-              /* Mobile: TouchableOpacity mở TimePicker */
-              <TouchableOpacity
-                style={ms.pickerTrigger}
-                onPress={() => { setShowDatePicker(false); setShowTimePicker(v => !v); }}
-              >
-                <Text style={ms.pickerTriggerIcon}>🕐</Text>
-                <Text style={ms.pickerTriggerValue}>{time}</Text>
-                <Text style={ms.pickerTriggerHint}>Nhấn để chọn</Text>
-              </TouchableOpacity>
-            )}
+            {/* Hiển thị giờ đã chọn + nút mở picker (mobile) */}
+            <TouchableOpacity
+              style={ms.pickerTrigger}
+              onPress={() => {
+                if (Platform.OS !== "web") { setShowDatePicker(false); setShowTimePicker(v => !v); }
+              }}
+              activeOpacity={Platform.OS === "web" ? 1 : 0.7}
+            >
+              <Text style={ms.pickerTriggerIcon}>🕐</Text>
+              <Text style={ms.pickerTriggerValue}>{time}</Text>
+              {Platform.OS !== "web"
+                ? <Text style={ms.pickerTriggerHint}>Nhấn để chọn</Text>
+                : <Text style={ms.pickerTriggerHint}>Dùng các nút trên hoặc nhập thủ công</Text>
+              }
+            </TouchableOpacity>
 
-            {/* Native TimePicker (mobile) */}
+            {/* Mobile TimePicker */}
             {showTimePicker && DateTimePicker && Platform.OS !== "web" && (
               <DateTimePicker
-                value={pickerDate}
-                mode="time"
-                is24Hour
+                value={pickerDate} mode="time" is24Hour
                 display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={(_: any, selected?: Date) => {
+                onChange={(_: any, sel?: Date) => {
                   if (Platform.OS === "android") setShowTimePicker(false);
-                  if (selected) {
-                    setTime(`${pad2(selected.getHours())}:${pad2(selected.getMinutes())}`);
-                  }
+                  if (sel) setTime(`${pad2(sel.getHours())}:${pad2(sel.getMinutes())}`);
                 }}
                 style={ms.nativePicker}
               />
@@ -504,7 +450,19 @@ function ReminderModal({
               </TouchableOpacity>
             )}
 
-            {/* Repeat */}
+            {/* Web: manual text input time */}
+            {Platform.OS === "web" && (
+              <TextInput
+                style={ms.dateInput}
+                value={time}
+                onChangeText={v => setTime(v.replace(/[^\d:]/g, "").slice(0, 5))}
+                placeholder="HH:MM  (vd: 07:30)"
+                placeholderTextColor="#aaa"
+                maxLength={5}
+              />
+            )}
+
+            {/* Lặp lại */}
             <Text style={ms.fieldLabel}>Lặp lại</Text>
             <View style={ms.repeatRow}>
               {REPEAT_OPTIONS.map(r => (
@@ -513,14 +471,12 @@ function ReminderModal({
                   style={[ms.repeatChip, repeat === r.key && ms.repeatChipActive]}
                   onPress={() => setRepeat(r.key)}
                 >
-                  <Text style={[ms.repeatChipText, repeat === r.key && ms.repeatChipTextActive]}>
-                    {r.label}
-                  </Text>
+                  <Text style={[ms.repeatChipText, repeat === r.key && ms.repeatChipTextActive]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* Remind before */}
+            {/* Nhắc trước */}
             <Text style={ms.fieldLabel}>Nhắc trước</Text>
             <View style={ms.repeatRow}>
               {REMIND_BEFORE.map(r => (
@@ -529,43 +485,63 @@ function ReminderModal({
                   style={[ms.repeatChip, remindBefore === r.key && ms.repeatChipActive]}
                   onPress={() => setRemindBefore(r.key)}
                 >
-                  <Text style={[ms.repeatChipText, remindBefore === r.key && ms.repeatChipTextActive]}>
-                    {r.label}
-                  </Text>
+                  <Text style={[ms.repeatChipText, remindBefore === r.key && ms.repeatChipTextActive]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* Preview card */}
-            <View style={ms.previewCard}>
-              <Text style={ms.previewTitle}>Xem trước</Text>
-              <View style={ms.previewRow}>
-                <Text style={ms.previewIcon}>{selectedTask.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={ms.previewTaskName}>{selectedTask.label}</Text>
-                  {customNote ? <Text style={ms.previewNote}>{customNote}</Text> : null}
-                  <Text style={ms.previewDate}>
-                    📅 {formatDateVN(date)} lúc {time}
-                  </Text>
-                  <Text style={ms.previewRepeat}>
-                    🔁 {REPEAT_OPTIONS.find(r => r.key === repeat)?.label}
-                    {"  "}🔔 {REMIND_BEFORE.find(r => r.key === remindBefore)?.label}
-                  </Text>
+            {/* Lỗi form */}
+            {formError ? (
+              <View style={ms.formErrorBox}>
+                <Text style={ms.formErrorText}>⚠️ {formError}</Text>
+              </View>
+            ) : null}
+
+            {/* ── Inline confirm card (thay thế cho dialog) ── */}
+            {confirmSave ? (
+              <View style={ms.confirmCard}>
+                <Text style={ms.confirmTitle}>Xác nhận lưu lịch nhắc?</Text>
+                <View style={ms.confirmPreviewRow}>
+                  <Text style={{ fontSize: 28 }}>{selectedTask.icon}</Text>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={ms.confirmTaskName}>{selectedTask.label}</Text>
+                    {customNote ? <Text style={ms.confirmNote}>{customNote}</Text> : null}
+                    <Text style={ms.confirmDate}>📅 {formatDateVN(date)} lúc {time}</Text>
+                    <Text style={ms.confirmRepeat}>
+                      🔁 {REPEAT_OPTIONS.find(r => r.key === repeat)?.label}
+                      {"  "}🔔 {REMIND_BEFORE.find(r => r.key === remindBefore)?.label}
+                    </Text>
+                  </View>
+                </View>
+                <View style={ms.confirmBtnRow}>
+                  <TouchableOpacity style={ms.confirmCancelBtn} onPress={() => setConfirmSave(false)}>
+                    <Text style={ms.confirmCancelText}>← Sửa lại</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[ms.confirmOkBtn, saving && ms.saveBtnDisabled]}
+                    onPress={doSave}
+                    disabled={saving}
+                  >
+                    {saving
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={ms.confirmOkText}>✅ Lưu ngay</Text>
+                    }
+                  </TouchableOpacity>
                 </View>
               </View>
-            </View>
-
-            {/* Save button */}
-            <TouchableOpacity
-              style={[ms.saveBtn, saving && ms.saveBtnDisabled]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={ms.saveBtnText}>✅ Lưu lịch nhắc</Text>
-              }
-            </TouchableOpacity>
+            ) : (
+              /* Nút Lưu bình thường */
+              <TouchableOpacity
+                style={[ms.saveBtn, saving && ms.saveBtnDisabled]}
+                onPress={handleSavePress}
+                disabled={saving}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={ms.saveBtnText}>✅ Lưu lịch nhắc</Text>
+                }
+              </TouchableOpacity>
+            )}
 
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -590,9 +566,7 @@ function ReminderModal({
                 contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
                 ListHeaderComponent={
                   <Text style={ms.listHeader}>
-                    {reminders.filter(r => !r.done).length} lịch chưa hoàn thành
-                    {"  ·  "}
-                    {reminders.filter(r => r.done).length} đã xong
+                    {reminders.filter(r => !r.done).length} chưa hoàn thành  ·  {reminders.filter(r => r.done).length} đã xong
                   </Text>
                 }
                 renderItem={({ item }) => (
@@ -604,17 +578,11 @@ function ReminderModal({
                       <Text style={[ms.reminderTitle, item.done && ms.strikeThroughText]}>
                         {item.taskLabel}
                       </Text>
-                      {item.customNote ? (
-                        <Text style={ms.reminderNote} numberOfLines={2}>{item.customNote}</Text>
-                      ) : null}
-                      <Text style={ms.reminderDate}>
-                        📅 {formatDateVN(item.date)} lúc {item.time}
-                      </Text>
+                      {item.customNote ? <Text style={ms.reminderNote} numberOfLines={2}>{item.customNote}</Text> : null}
+                      <Text style={ms.reminderDate}>📅 {formatDateVN(item.date)} lúc {item.time}</Text>
                       <View style={ms.reminderBadgeRow}>
                         <View style={ms.reminderBadge}>
-                          <Text style={ms.reminderBadgeText}>
-                            {REPEAT_OPTIONS.find(r => r.key === item.repeat)?.label}
-                          </Text>
+                          <Text style={ms.reminderBadgeText}>{REPEAT_OPTIONS.find(r => r.key === item.repeat)?.label}</Text>
                         </View>
                         <View style={[ms.reminderBadge, { backgroundColor: "#e3f2fd" }]}>
                           <Text style={[ms.reminderBadgeText, { color: Colors.info }]}>
@@ -627,6 +595,21 @@ function ReminderModal({
                           </View>
                         )}
                       </View>
+
+                      {/* Inline delete confirm */}
+                      {confirmDeleteId === item.id && (
+                        <View style={ms.inlineDeleteConfirm}>
+                          <Text style={ms.inlineDeleteText}>Xác nhận xoá lịch này?</Text>
+                          <View style={ms.inlineDeleteBtns}>
+                            <TouchableOpacity style={ms.inlineDeleteCancel} onPress={() => setConfirmDeleteId(null)}>
+                              <Text style={ms.inlineDeleteCancelText}>Huỷ</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={ms.inlineDeleteOk} onPress={() => doDelete(item.id)}>
+                              <Text style={ms.inlineDeleteOkText}>🗑 Xoá</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
                     </View>
                     <View style={ms.reminderActions}>
                       <TouchableOpacity
@@ -638,15 +621,11 @@ function ReminderModal({
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={ms.delBtn}
-                        onPress={() => {
-                          const msg = `Xoá lịch?\n${item.taskIcon} ${item.taskLabel}\n${formatDateVN(item.date)} ${item.time}`;
-                          if (Platform.OS === "web") {
-                            if ((globalThis as any).confirm?.(msg)) handleDelete(item.id);
-                          } else {
-                            Alert.alert("Xoá lịch?", `${item.taskIcon} ${item.taskLabel}\n${formatDateVN(item.date)} ${item.time}`, [
-                              { text: "Huỷ", style: "cancel" },
-                              { text: "Xoá", style: "destructive", onPress: () => handleDelete(item.id) },
+                        style={[ms.delBtn, confirmDeleteId === item.id && { backgroundColor: "#ffcdd2" }]}
+                        onPress={() => setConfirmDeleteId(confirmDeleteId === item.id ? null : item.id)}
+                      >
+                        <Text style={ms.delBtnText}>🗑</Text>
+                      </TouchableOpacity>
                             ]);
                           }
                         }}
