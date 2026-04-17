@@ -1,15 +1,13 @@
 /**
- * WeatherCard.tsx
- * ───────────────
- * Card dự báo 7 ngày đầy đủ + khuyến nghị nông nghiệp.
- * - 7 ô dàn đều toàn bộ chiều ngang, tap để chọn ngày
- * - Khi chọn ngày → picker loại công việc + nút "Đặt lịch chăm sóc"
+ * WeatherCard.tsx — compact version
+ * Card dự báo 7 ngày gọn gàng, không có cụm đặt lịch inline
+ * (dùng nút "Nhắc lịch" trên header của màn Xử lý).
  */
 
 import React, { useState } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Modal, FlatList, ScrollView,
+  ActivityIndicator, Modal, FlatList,
 } from "react-native";
 import { useWeatherContext } from "../contexts/WeatherContext";
 import {
@@ -18,331 +16,78 @@ import {
 } from "../hooks/useWeather";
 import { Colors } from "../constants/Colors";
 
-// ───────────────────────────────────────────────
-//  Helpers
-// ───────────────────────────────────────────────
-function shortDayLabel(dateStr: string, index: number): string {
-  if (index === 0) return "Hôm nay";
-  if (index === 1) return "Mai";
+// ─── Helpers ────────────────────────────────────────────────
+function dayLabel(dateStr: string, idx: number): string {
+  if (idx === 0) return "Hôm\nnay";
+  if (idx === 1) return "Mai";
   const d   = new Date(dateStr + "T00:00:00");
-  const dow = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d.getDay()];
-  return `${dow}\n${d.getDate()}/${d.getMonth() + 1}`;
+  const dow = ["CN","T2","T3","T4","T5","T6","T7"][d.getDay()];
+  return `${dow}\n${d.getDate()}/${d.getMonth()+1}`;
 }
 
-function fullDayLabel(dateStr: string): string {
-  const [, m, d] = dateStr.split("-");
-  return `${d}/${m}`;
+function RiskDot({ level, size = 7 }: { level: RiskLevel; size?: number }) {
+  return <View style={{ width: size, height: size, borderRadius: size/2, backgroundColor: RISK_COLOR[level] }} />;
 }
 
-function RiskDot({ level, size = 8 }: { level: RiskLevel; size?: number }) {
-  return (
-    <View style={{
-      width: size, height: size, borderRadius: size / 2,
-      backgroundColor: RISK_COLOR[level],
-    }} />
-  );
-}
-
-// ───────────────────────────────────────────────
-//  Task types (quick-pick)
-// ───────────────────────────────────────────────
-const QUICK_TASKS = [
-  { key: "phun_thuoc", label: "Phun thuốc",   icon: "🌿" },
-  { key: "bon_phan",   label: "Bón phân",      icon: "🌱" },
-  { key: "tuoi_nuoc",  label: "Tưới nước",     icon: "💧" },
-  { key: "cat_tia",    label: "Cắt tỉa",       icon: "✂️" },
-  { key: "kiem_tra",   label: "Kiểm tra vườn", icon: "🔍" },
-  { key: "thu_hoach",  label: "Thu hoạch",     icon: "🌾" },
-];
-
-// ───────────────────────────────────────────────
-//  ForecastGrid — 7 ô fill full width
-// ───────────────────────────────────────────────
-function ForecastGrid({
-  weather,
-  selectedDate,
-  onSelectDate,
-}: {
-  weather: ProvinceWeather;
-  selectedDate: string | null;
-  onSelectDate: (date: string) => void;
-}) {
-  return (
-    <View style={fg.grid}>
-      {weather.forecasts.map((f, i) => {
-        const isSelected = f.date === selectedDate;
-        const isToday    = i === 0;
-        const riskC      = RISK_COLOR[f.riskLevel];
-        const riskB      = RISK_BG[f.riskLevel];
-
-        return (
-          <TouchableOpacity
-            key={f.date}
-            style={[
-              fg.cell,
-              isToday    && { borderColor: riskC, borderWidth: 1.5 },
-              isSelected && { backgroundColor: riskC, borderColor: riskC, borderWidth: 2 },
-              !isSelected && isToday && { backgroundColor: riskB },
-            ]}
-            onPress={() => onSelectDate(isSelected ? "" : f.date)}
-            activeOpacity={0.75}
-          >
-            {/* Nhãn ngày */}
-            <Text style={[fg.dow, isSelected && { color: "#fff" }]}
-              numberOfLines={2} textBreakStrategy="simple"
-            >
-              {shortDayLabel(f.date, i)}
-            </Text>
-
-            {/* Icon thời tiết */}
-            <Text style={fg.emoji}>{weatherEmoji(f.weatherCode)}</Text>
-
-            {/* Nhiệt độ max */}
-            <Text style={[fg.temp, isSelected && { color: "#fff" }]}>
-              {f.tempMax}°
-            </Text>
-
-            {/* Độ ẩm */}
-            <Text style={[fg.hum, isSelected && { color: "rgba(255,255,255,.85)" }]}>
-              {f.humidity}%
-            </Text>
-
-            {/* Mưa */}
-            {f.rain > 0 ? (
-              <Text style={[fg.rain, isSelected && { color: "rgba(255,255,255,.9)" }]}>
-                {f.rain}mm
-              </Text>
-            ) : (
-              <View style={{ height: 14 }} />
-            )}
-
-            {/* Risk dot */}
-            <View style={fg.dotWrap}>
-              <View style={[
-                fg.dot,
-                { backgroundColor: isSelected ? "#fff" : riskC },
-              ]} />
-            </View>
-
-            {/* Checkmark khi chọn */}
-            {isSelected && (
-              <View style={fg.checkBadge}>
-                <Text style={fg.checkText}>✓</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-const fg = StyleSheet.create({
-  grid: {
-    flexDirection: "row",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 5,
-  },
-  cell: {
-    flex: 1,
-    alignItems: "center",
-    backgroundColor: "#f7f7f7",
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 2,
-    borderWidth: 1,
-    borderColor: "#e8e8e8",
-    position: "relative",
-  },
-  dow: {
-    fontSize: 9, fontWeight: "700",
-    color: Colors.textMuted,
-    textAlign: "center",
-    marginBottom: 4,
-    lineHeight: 13,
-  },
-  emoji:  { fontSize: 17, marginBottom: 3 },
-  temp:   { fontSize: 13, fontWeight: "800", color: Colors.text },
-  hum:    { fontSize: 9,  color: Colors.textMuted, marginTop: 1 },
-  rain:   { fontSize: 9,  color: "#1976d2", marginTop: 1 },
-  dotWrap: { marginTop: 4, alignItems: "center" },
-  dot:     { width: 7, height: 7, borderRadius: 3.5 },
-  checkBadge: {
-    position: "absolute", top: 4, right: 4,
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: "rgba(255,255,255,0.35)",
-    alignItems: "center", justifyContent: "center",
-  },
-  checkText: { fontSize: 8, color: "#fff", fontWeight: "900" },
-});
-
-// ───────────────────────────────────────────────
-//  Task picker + schedule button
-// ───────────────────────────────────────────────
-function ScheduleSection({
-  selectedDate,
-  selectedTask,
-  onSelectTask,
-  onSchedule,
-  riskColor,
-}: {
-  selectedDate: string;
-  selectedTask: string;
-  onSelectTask: (key: string) => void;
-  onSchedule: () => void;
-  riskColor: string;
-}) {
-  const task = QUICK_TASKS.find(t => t.key === selectedTask) ?? QUICK_TASKS[0];
-  return (
-    <View style={ss.wrap}>
-      {/* Ngày đã chọn */}
-      <Text style={ss.title}>
-        📅 Đặt lịch ngày <Text style={{ color: riskColor, fontWeight: "800" }}>
-          {fullDayLabel(selectedDate)}
-        </Text> — chọn công việc:
-      </Text>
-
-      {/* Quick-pick chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={ss.chips}
-      >
-        {QUICK_TASKS.map(t => {
-          const active = t.key === selectedTask;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[ss.chip, active && { backgroundColor: riskColor, borderColor: riskColor }]}
-              onPress={() => onSelectTask(t.key)}
-              activeOpacity={0.8}
-            >
-              <Text style={ss.chipIcon}>{t.icon}</Text>
-              <Text style={[ss.chipLabel, active && { color: "#fff" }]}>{t.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Nút đặt lịch */}
-      <TouchableOpacity
-        style={[ss.btn, { backgroundColor: riskColor }]}
-        onPress={onSchedule}
-        activeOpacity={0.85}
-      >
-        <Text style={ss.btnText}>
-          {task.icon} Đặt lịch {task.label.toLowerCase()} ngày {fullDayLabel(selectedDate)}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-const ss = StyleSheet.create({
-  wrap: {
-    marginHorizontal: 10, marginBottom: 10,
-    backgroundColor: "#f9f9f9",
-    borderRadius: 14, padding: 12,
-    borderWidth: 1, borderColor: "#e8e8e8",
-  },
-  title: { fontSize: 12, color: Colors.textMuted, marginBottom: 10, lineHeight: 18 },
-  chips: { gap: 7, paddingBottom: 2 },
-  chip:  {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "#fff",
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
-    borderWidth: 1.5, borderColor: "#e0e0e0",
-  },
-  chipIcon:  { fontSize: 14 },
-  chipLabel: { fontSize: 12, fontWeight: "600", color: Colors.text },
-  btn: {
-    marginTop: 10, borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 16,
-    alignItems: "center",
-  },
-  btnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-});
-
-// ───────────────────────────────────────────────
-//  Tỉnh lân cận row
-// ───────────────────────────────────────────────
-function NeighborRow({ pw }: { pw: ProvinceWeather }) {
-  return (
-    <View style={nb.row}>
-      <Text style={nb.name}>📍 {pw.province}</Text>
-      <View style={nb.dots}>
-        {pw.forecasts.map(f => (
-          <RiskDot key={f.date} level={f.riskLevel} size={9} />
-        ))}
-      </View>
-      <Text style={[nb.badge, { color: RISK_COLOR[pw.weekRisk] }]}>
-        {pw.weekRisk === "very_high" ? "Rất cao" :
-         pw.weekRisk === "high"      ? "Cao" :
-         pw.weekRisk === "medium"    ? "TB" : "Thấp"}
-      </Text>
-    </View>
-  );
-}
-const nb = StyleSheet.create({
-  row:   { flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 8 },
-  name:  { flex: 1, fontSize: 12, fontWeight: "600", color: Colors.text },
-  dots:  { flexDirection: "row", gap: 4 },
-  badge: { fontSize: 11, fontWeight: "700", minWidth: 40, textAlign: "right" },
-});
-
-// ───────────────────────────────────────────────
-//  Province picker modal
-// ───────────────────────────────────────────────
+// ─── Province picker ─────────────────────────────────────────
 function ProvincePicker({ visible, current, onSelect, onClose }: {
   visible: boolean; current: string | null;
   onSelect: (p: string) => void; onClose: () => void;
 }) {
-  const provinces = Object.keys(PROVINCES).sort();
+  const list = Object.keys(PROVINCES).sort();
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={pm.backdrop}>
         <View style={pm.sheet}>
-          <View style={pm.header}>
+          <View style={pm.hdr}>
             <Text style={pm.title}>Chọn tỉnh / thành phố</Text>
-            <TouchableOpacity onPress={onClose}><Text style={pm.close}>✕</Text></TouchableOpacity>
+            <TouchableOpacity onPress={onClose}><Text style={pm.x}>✕</Text></TouchableOpacity>
           </View>
-          <FlatList
-            data={provinces} keyExtractor={p => p}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[pm.item, item === current && pm.itemActive]}
-                onPress={() => { onSelect(item); onClose(); }}
-              >
-                <Text style={[pm.itemText, item === current && pm.itemTextActive]}>
-                  {item === current ? "✓  " : "    "}{item}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
+          <FlatList data={list} keyExtractor={p=>p} renderItem={({item})=>(
+            <TouchableOpacity style={[pm.row, item===current && pm.rowOn]} onPress={()=>{onSelect(item);onClose();}}>
+              <Text style={[pm.rowTxt, item===current && pm.rowTxtOn]}>
+                {item===current?"✓  ":"    "}{item}
+              </Text>
+            </TouchableOpacity>
+          )}/>
         </View>
       </View>
     </Modal>
   );
 }
 const pm = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet:    { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "75%", paddingBottom: 32 },
-  header:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#eee" },
-  title:    { fontSize: 17, fontWeight: "700", color: Colors.text },
-  close:    { fontSize: 20, color: Colors.textMuted, padding: 4 },
-  item:     { paddingVertical: 14, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
-  itemActive:     { backgroundColor: Colors.primaryLt },
-  itemText:       { fontSize: 15, color: Colors.text },
-  itemTextActive: { fontWeight: "700", color: Colors.primary },
+  backdrop: { flex:1, backgroundColor:"rgba(0,0,0,.45)", justifyContent:"flex-end" },
+  sheet:    { backgroundColor:"#fff", borderTopLeftRadius:22, borderTopRightRadius:22, maxHeight:"72%", paddingBottom:28 },
+  hdr:      { flexDirection:"row", justifyContent:"space-between", alignItems:"center", padding:18, borderBottomWidth:1, borderBottomColor:"#eee" },
+  title:    { fontSize:16, fontWeight:"700", color:Colors.text },
+  x:        { fontSize:20, color:Colors.textMuted, padding:4 },
+  row:      { paddingVertical:13, paddingHorizontal:22, borderBottomWidth:1, borderBottomColor:"#f2f2f2" },
+  rowOn:    { backgroundColor: Colors.primaryLt },
+  rowTxt:   { fontSize:14, color:Colors.text },
+  rowTxtOn: { fontWeight:"700", color:Colors.primary },
 });
 
-// ───────────────────────────────────────────────
-//  MAIN COMPONENT
-// ───────────────────────────────────────────────
-export default function WeatherCard({
-  onSchedulePress,
-}: {
-  onSchedulePress?: (date: string, taskKey: string) => void;
-}) {
+// ─── Neighbor row ────────────────────────────────────────────
+function NeighborRow({ pw }: { pw: ProvinceWeather }) {
+  return (
+    <View style={nb.row}>
+      <Text style={nb.name}>📍 {pw.province}</Text>
+      <View style={nb.dots}>{pw.forecasts.map(f=><RiskDot key={f.date} level={f.riskLevel} size={8}/>)}</View>
+      <Text style={[nb.badge,{color:RISK_COLOR[pw.weekRisk]}]}>
+        {pw.weekRisk==="very_high"?"Rất cao":pw.weekRisk==="high"?"Cao":pw.weekRisk==="medium"?"TB":"Thấp"}
+      </Text>
+    </View>
+  );
+}
+const nb = StyleSheet.create({
+  row:   { flexDirection:"row", alignItems:"center", paddingVertical:5, gap:8 },
+  name:  { flex:1, fontSize:11, fontWeight:"600", color:Colors.text },
+  dots:  { flexDirection:"row", gap:3 },
+  badge: { fontSize:11, fontWeight:"700", minWidth:40, textAlign:"right" },
+});
+
+// ─── MAIN ────────────────────────────────────────────────────
+export default function WeatherCard() {
   const {
     loading, error, currentProvince, currentWeather,
     neighborWeathers, lastUpdated, recommendation,
@@ -351,145 +96,125 @@ export default function WeatherCard({
 
   const [showPicker,    setShowPicker]    = useState(false);
   const [showNeighbors, setShowNeighbors] = useState(false);
-  const [selectedDate,  setSelectedDate]  = useState<string>("");
-  const [selectedTask,  setSelectedTask]  = useState<string>("phun_thuoc");
 
   const updatedStr = lastUpdated
-    ? new Date(lastUpdated).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-    : null;
+    ? new Date(lastUpdated).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})
+    : "--";
 
-  // ── Skeleton ──
   if (loading && !currentWeather) {
     return (
       <View style={s.card}>
-        <View style={s.skeletonRow}>
-          <ActivityIndicator color={Colors.primary} />
-          <Text style={s.skeletonText}>Đang tải dự báo thời tiết...</Text>
+        <View style={s.skRow}>
+          <ActivityIndicator color={Colors.primary} size="small"/>
+          <Text style={s.skTxt}>Đang tải dự báo thời tiết...</Text>
         </View>
       </View>
     );
   }
-
   if (error) {
     return (
       <View style={s.card}>
-        <Text style={s.errorText}>⚠️ {error}</Text>
+        <Text style={s.errTxt}>⚠️ {error}</Text>
         <TouchableOpacity style={s.retryBtn} onPress={refresh}>
-          <Text style={s.retryText}>Thử lại</Text>
+          <Text style={s.retryTxt}>Thử lại</Text>
         </TouchableOpacity>
       </View>
     );
   }
-
   if (!currentWeather) return null;
 
-  const riskColor = RISK_COLOR[currentWeather.weekRisk];
-  const riskBg    = RISK_BG[currentWeather.weekRisk];
+  const riskC = RISK_COLOR[currentWeather.weekRisk];
+  const riskB = RISK_BG[currentWeather.weekRisk];
 
   return (
-    <View style={[s.card, { borderColor: riskColor }]}>
+    <View style={[s.card, { borderColor: riskC }]}>
 
       {/* ── Header ── */}
-      <View style={[s.header, { backgroundColor: riskBg }]}>
-        <View style={s.headerLeft}>
-          <Text style={s.headerTitle}>🌦️ Dự báo thời tiết</Text>
+      <View style={[s.header, { backgroundColor: riskB }]}>
+        <View style={{ flex:1 }}>
+          <Text style={s.headerTitle}>🌦️ Dự báo thời tiết 7 ngày</Text>
           <TouchableOpacity onPress={() => setShowPicker(true)}>
-            <Text style={[s.provinceName, { color: riskColor }]}>📍 {currentProvince} ▾</Text>
+            <Text style={[s.provinceTxt, { color: riskC }]}>📍 {currentProvince} ▾</Text>
           </TouchableOpacity>
         </View>
         <View style={s.headerRight}>
-          <View style={[s.riskBadge, { backgroundColor: riskColor }]}>
-            <Text style={s.riskBadgeText}>{RISK_LABEL[currentWeather.weekRisk]}</Text>
+          {/* Stat pills */}
+          <View style={s.pill}>
+            <Text style={s.pillTxt}>🌧️ {currentWeather.rainDays}/7</Text>
           </View>
-          <TouchableOpacity onPress={refresh} style={s.refreshBtn}>
-            <Text style={{ fontSize: 18 }}>🔄</Text>
+          <View style={s.pill}>
+            <Text style={s.pillTxt}>💧 {currentWeather.avgHumidity}%</Text>
+          </View>
+          <View style={[s.riskBadge, { backgroundColor: riskC }]}>
+            <Text style={s.riskBadgeTxt}>{RISK_LABEL[currentWeather.weekRisk]}</Text>
+          </View>
+          <TouchableOpacity onPress={refresh} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+            <Text style={{ fontSize:16 }}>🔄</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── Stats ── */}
-      <View style={s.statsRow}>
-        <View style={s.statItem}>
-          <Text style={s.statVal}>🌧️ {currentWeather.rainDays}/7</Text>
-          <Text style={s.statLbl}>ngày mưa</Text>
-        </View>
-        <View style={s.statDiv} />
-        <View style={s.statItem}>
-          <Text style={s.statVal}>💧 {currentWeather.avgHumidity}%</Text>
-          <Text style={s.statLbl}>ẩm trung bình</Text>
-        </View>
-        <View style={s.statDiv} />
-        <View style={s.statItem}>
-          <Text style={s.statVal}>{updatedStr ?? "--"}</Text>
-          <Text style={s.statLbl}>cập nhật</Text>
-        </View>
+      {/* ── 7-day grid ── */}
+      <View style={s.grid}>
+        {currentWeather.forecasts.map((f, i) => {
+          const rc = RISK_COLOR[f.riskLevel];
+          const rb = RISK_BG[f.riskLevel];
+          return (
+            <View key={f.date} style={[
+              s.cell,
+              i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 1.5 },
+            ]}>
+              <Text style={[s.cellDow, i===0 && { color: rc, fontWeight:"800" }]}
+                numberOfLines={2} textBreakStrategy="simple">
+                {dayLabel(f.date, i)}
+              </Text>
+              <Text style={s.cellEmoji}>{weatherEmoji(f.weatherCode)}</Text>
+              <Text style={s.cellTemp}>{f.tempMax}°</Text>
+              <Text style={s.cellHum}>{f.humidity}%</Text>
+              {f.rain > 0
+                ? <Text style={s.cellRain}>{f.rain}mm</Text>
+                : <View style={{height:12}}/>
+              }
+              <RiskDot level={f.riskLevel} size={6}/>
+            </View>
+          );
+        })}
       </View>
 
-      {/* ── 7 ngày grid (fill full width) ── */}
-      <ForecastGrid
-        weather={currentWeather}
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-      />
-
-      {/* ── Hint khi chưa chọn ── */}
-      {!selectedDate && (
-        <Text style={s.hint}>👆 Nhấn vào ô ngày để đặt lịch chăm sóc</Text>
-      )}
-
-      {/* ── Risk legend ── */}
-      <View style={s.legendRow}>
+      {/* ── Legend (1 dòng nhỏ) ── */}
+      <View style={s.legend}>
         {(["low","medium","high","very_high"] as RiskLevel[]).map(r => (
           <View key={r} style={s.legendItem}>
-            <RiskDot level={r} size={8} />
-            <Text style={s.legendText}>
-              {r === "low" ? "Thấp" : r === "medium" ? "TB" : r === "high" ? "Cao" : "Rất cao"}
+            <RiskDot level={r} size={7}/>
+            <Text style={s.legendTxt}>
+              {r==="low"?"Thấp":r==="medium"?"TB":r==="high"?"Cao":"Rất cao"}
             </Text>
           </View>
         ))}
+        <Text style={s.updatedTxt}>· {updatedStr}</Text>
       </View>
-
-      {/* ── Schedule section (chỉ hiện khi chọn ngày) ── */}
-      {selectedDate && (
-        <ScheduleSection
-          selectedDate={selectedDate}
-          selectedTask={selectedTask}
-          onSelectTask={setSelectedTask}
-          onSchedule={() => {
-            onSchedulePress?.(selectedDate, selectedTask);
-            setSelectedDate("");
-          }}
-          riskColor={riskColor}
-        />
-      )}
 
       {/* ── Khuyến nghị ── */}
-      <View style={s.tipsSection}>
-        <Text style={s.tipsTitle}>💡 Khuyến nghị tuần này</Text>
-        {recommendation.map((tip, i) => (
-          <Text key={i} style={s.tipText}>{tip}</Text>
-        ))}
-      </View>
+      {recommendation.length > 0 && (
+        <View style={s.tips}>
+          <Text style={s.tipsTitle}>💡 Khuyến nghị tuần này</Text>
+          {recommendation.map((tip, i) => (
+            <Text key={i} style={s.tipRow}>{tip}</Text>
+          ))}
+        </View>
+      )}
 
       {/* ── Tỉnh lân cận (collapsible) ── */}
       {neighborWeathers.length > 0 && (
         <>
-          <TouchableOpacity
-            style={s.neighborToggle}
-            onPress={() => setShowNeighbors(v => !v)}
-          >
-            <Text style={s.neighborToggleText}>
+          <TouchableOpacity style={s.neighborToggle} onPress={() => setShowNeighbors(v=>!v)}>
+            <Text style={s.neighborToggleTxt}>
               {showNeighbors ? "▲" : "▼"} Nguy cơ tỉnh lân cận
             </Text>
           </TouchableOpacity>
           {showNeighbors && (
             <View style={s.neighborList}>
-              <View style={s.neighborHeader}>
-                <Text style={s.neighborHeaderTxt}>Tỉnh</Text>
-                <Text style={s.neighborHeaderTxt}>Hôm nay → 7 ngày</Text>
-                <Text style={s.neighborHeaderTxt}>Tuần</Text>
-              </View>
-              {neighborWeathers.map(pw => <NeighborRow key={pw.province} pw={pw} />)}
+              {neighborWeathers.map(pw => <NeighborRow key={pw.province} pw={pw}/>)}
             </View>
           )}
         </>
@@ -505,79 +230,80 @@ export default function WeatherCard({
   );
 }
 
-// ───────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────
 const s = StyleSheet.create({
   card: {
-    backgroundColor: "#fff", borderRadius: 18,
-    borderWidth: 1.5, borderColor: Colors.border,
-    marginHorizontal: 16, marginTop: 14, marginBottom: 6,
-    overflow: "hidden",
-    shadowColor: "#000", shadowOpacity: 0.07,
-    shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    backgroundColor:"#fff", borderRadius:16,
+    borderWidth:1.5, borderColor:Colors.border,
+    marginHorizontal:16, marginTop:12, marginBottom:4,
+    overflow:"hidden",
+    shadowColor:"#000", shadowOpacity:0.06,
+    shadowRadius:8, shadowOffset:{width:0,height:2},
+    elevation:3,
   },
+
+  // Header
   header: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection:"row", alignItems:"center",
+    paddingHorizontal:14, paddingVertical:10, gap:8,
   },
-  headerLeft:     { flex: 1 },
-  headerRight:    { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerTitle:    { fontSize: 13, fontWeight: "700", color: Colors.text, marginBottom: 3 },
-  provinceName:   { fontSize: 14, fontWeight: "800" },
-  riskBadge:      { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  riskBadgeText:  { color: "#fff", fontSize: 11, fontWeight: "700" },
-  refreshBtn:     { padding: 4 },
+  headerTitle:  { fontSize:12, fontWeight:"700", color:Colors.text, marginBottom:2 },
+  provinceTxt:  { fontSize:13, fontWeight:"800" },
+  headerRight:  { flexDirection:"row", alignItems:"center", gap:6, flexShrink:0 },
+  pill:         { backgroundColor:"rgba(0,0,0,.06)", borderRadius:20, paddingHorizontal:8, paddingVertical:3 },
+  pillTxt:      { fontSize:10, fontWeight:"600", color:Colors.text },
+  riskBadge:    { borderRadius:20, paddingHorizontal:9, paddingVertical:4 },
+  riskBadgeTxt: { color:"#fff", fontSize:10, fontWeight:"700" },
 
-  statsRow: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: "#f0f0f0",
+  // 7-day grid
+  grid: {
+    flexDirection:"row",
+    paddingHorizontal:8, paddingVertical:8, gap:4,
   },
-  statItem:   { flex: 1, alignItems: "center" },
-  statVal:    { fontSize: 12, fontWeight: "700", color: Colors.text },
-  statLbl:    { fontSize: 10, color: Colors.textMuted, marginTop: 1 },
-  statDiv:    { width: 1, height: 28, backgroundColor: "#e0e0e0" },
-
-  hint: {
-    textAlign: "center", fontSize: 11, color: Colors.textMuted,
-    marginTop: -2, marginBottom: 6, fontStyle: "italic",
+  cell: {
+    flex:1, alignItems:"center",
+    backgroundColor:"#f7f7f7",
+    borderRadius:10, paddingVertical:7, paddingHorizontal:2,
+    borderWidth:1, borderColor:"#ebebeb",
+    gap:2,
   },
+  cellDow:   { fontSize:8, fontWeight:"600", color:Colors.textMuted, textAlign:"center", lineHeight:11 },
+  cellEmoji: { fontSize:15 },
+  cellTemp:  { fontSize:12, fontWeight:"800", color:Colors.text },
+  cellHum:   { fontSize:8,  color:Colors.textMuted },
+  cellRain:  { fontSize:8,  color:"#1976d2" },
 
-  legendRow: {
-    flexDirection: "row", justifyContent: "center", gap: 14,
-    paddingVertical: 4, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: "#f5f5f5",
-    marginBottom: 2,
+  // Legend
+  legend: {
+    flexDirection:"row", alignItems:"center", justifyContent:"center",
+    gap:10, paddingBottom:8, paddingHorizontal:12,
   },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  legendText: { fontSize: 10, color: Colors.textMuted },
+  legendItem: { flexDirection:"row", alignItems:"center", gap:3 },
+  legendTxt:  { fontSize:9, color:Colors.textMuted },
+  updatedTxt: { fontSize:9, color:Colors.textMuted },
 
-  tipsSection: {
-    backgroundColor: "#f8fffe",
-    marginHorizontal: 10, marginTop: 8, marginBottom: 10,
-    borderRadius: 12, padding: 12,
-    borderWidth: 1, borderColor: "#e0f2f1",
+  // Tips
+  tips: {
+    backgroundColor:"#f4fdf6",
+    marginHorizontal:10, marginBottom:10,
+    borderRadius:10, padding:10,
+    borderWidth:1, borderColor:"#c8e6c9",
   },
-  tipsTitle: { fontSize: 12, fontWeight: "700", color: Colors.primary, marginBottom: 8 },
-  tipText:   { fontSize: 12, color: Colors.text, lineHeight: 19, marginBottom: 4 },
+  tipsTitle: { fontSize:11, fontWeight:"700", color:Colors.primary, marginBottom:6 },
+  tipRow:    { fontSize:11, color:Colors.text, lineHeight:18, marginBottom:2 },
 
+  // Neighbors
   neighborToggle: {
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderTopWidth: 1, borderTopColor: "#f0f0f0",
-    alignItems: "center",
+    paddingVertical:9, alignItems:"center",
+    borderTopWidth:1, borderTopColor:"#f0f0f0",
   },
-  neighborToggleText: { fontSize: 12, color: Colors.primary, fontWeight: "600" },
-  neighborList:       { paddingHorizontal: 16, paddingBottom: 12 },
-  neighborHeader:     {
-    flexDirection: "row", justifyContent: "space-between",
-    marginBottom: 4, paddingBottom: 6,
-    borderBottomWidth: 1, borderBottomColor: "#eee",
-  },
-  neighborHeaderTxt: { fontSize: 10, color: Colors.textMuted, fontWeight: "600" },
+  neighborToggleTxt: { fontSize:11, color:Colors.primary, fontWeight:"600" },
+  neighborList:      { paddingHorizontal:14, paddingBottom:10 },
 
-  skeletonRow:  { flexDirection: "row", alignItems: "center", gap: 10, padding: 20 },
-  skeletonText: { fontSize: 13, color: Colors.textMuted },
-  errorText:    { fontSize: 13, color: "#c62828", padding: 16 },
-  retryBtn:     { marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.primary, borderRadius: 10, padding: 10, alignItems: "center" },
-  retryText:    { color: "#fff", fontSize: 13, fontWeight: "600" },
+  // States
+  skRow:    { flexDirection:"row", alignItems:"center", gap:10, padding:16 },
+  skTxt:    { fontSize:12, color:Colors.textMuted },
+  errTxt:   { fontSize:12, color:"#c62828", padding:14 },
+  retryBtn: { marginHorizontal:14, marginBottom:10, backgroundColor:Colors.primary, borderRadius:8, padding:8, alignItems:"center" },
+  retryTxt: { color:"#fff", fontSize:12, fontWeight:"600" },
 });

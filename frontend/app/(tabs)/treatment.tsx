@@ -907,13 +907,7 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
         keyboardShouldPersistTaps="handled"
       >
         {/* ── Dự báo thời tiết 7 ngày ── */}
-        <WeatherCard
-          onSchedulePress={(date, taskKey) => {
-            setReminderPrefill(date);
-            setReminderTask(taskKey);
-            setShowReminder(true);
-          }}
-        />
+        <WeatherCard />
 
         {disease && (
           <>
