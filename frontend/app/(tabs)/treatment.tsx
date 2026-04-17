@@ -167,24 +167,63 @@ function ReminderModal({
     const fireDate   = new Date(y, mo - 1, d, h, mi, 0);
     const offsetMs   = parseInt(r.remindBefore) * 60 * 1000;
     const triggerMs  = fireDate.getTime() - offsetMs - Date.now();
-    if (triggerMs <= 0) return undefined;
-    const triggerObj: any = r.repeat === "none"
-      ? { seconds: Math.floor(triggerMs / 1000) }
-      : r.repeat === "daily"   ? { hour: h, minute: mi, repeats: true }
-      : r.repeat === "weekly"  ? { weekday: fireDate.getDay() + 1, hour: h, minute: mi, repeats: true }
-      : { day: d, hour: h, minute: mi, repeats: true };
-    try {
-      return await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `${r.taskIcon} ${r.taskLabel}`,
-          body: r.customNote
-            ? `📌 ${r.customNote}\n📅 ${formatDateVN(r.date)} ${r.time}`
-            : `📅 ${formatDateVN(r.date)} lúc ${r.time}`,
-          sound: true,
-        },
-        trigger: triggerObj,
-      });
-    } catch { return undefined; }
+
+    let mainNotifId: string | undefined;
+
+    // ── Notification 1: nhắc trước theo cài đặt (remindBefore) ──
+    if (triggerMs > 0) {
+      const triggerObj: any = r.repeat === "none"
+        ? { seconds: Math.floor(triggerMs / 1000) }
+        : r.repeat === "daily"   ? { hour: h, minute: mi, repeats: true }
+        : r.repeat === "weekly"  ? { weekday: fireDate.getDay() + 1, hour: h, minute: mi, repeats: true }
+        : { day: d, hour: h, minute: mi, repeats: true };
+      try {
+        mainNotifId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `${r.taskIcon} Sắp tới: ${r.taskLabel}`,
+            body: r.customNote
+              ? `📌 ${r.customNote}\n📅 ${formatDateVN(r.date)} lúc ${r.time}`
+              : `📅 Hôm nay lúc ${r.time} — Đừng quên nhé!`,
+            sound: true,
+          },
+          trigger: triggerObj,
+        });
+      } catch {}
+    }
+
+    // ── Notification 2: nhắc trước 1 ngày lúc 8:00 sáng ────────
+    // Chỉ lên lịch nếu ngày thực hiện >= ngày mai
+    const dayBefore = new Date(y, mo - 1, d - 1, 8, 0, 0); // 8:00 AM ngày trước
+    const dayBeforeMs = dayBefore.getTime() - Date.now();
+
+    if (dayBeforeMs > 0) {
+      const DAY_MESSAGES: Record<string, string> = {
+        phun_thuoc: "Nhớ chuẩn bị thuốc và dụng cụ phun, kiểm tra thời tiết trước khi phun nhé! 🌤️",
+        bon_phan:   "Chuẩn bị phân bón đầy đủ, nên bón vào sáng sớm hoặc chiều mát để đạt hiệu quả tốt nhất.",
+        tuoi_nuoc:  "Nhớ kiểm tra hệ thống tưới và nguồn nước trước khi tưới nhé! 💧",
+        lam_bong:   "Theo dõi thời tiết, nên làm bông vào buổi sáng sớm khi trời mát.",
+        don_la:     "Chuẩn bị dụng cụ dọn vườn, thu gom và xử lý lá đúng cách để hạn chế mầm bệnh.",
+        cat_tia:    "Chuẩn bị kéo/cưa sắc và sát trùng dụng cụ trước khi cắt tỉa.",
+        kiem_tra:   "Chuẩn bị sổ ghi chép để theo dõi và phát hiện sâu bệnh kịp thời.",
+        thu_hoach:  "Chuẩn bị giỏ/thùng thu hoạch, kiểm tra độ chín trước khi hái nhé! 🌾",
+        khac:       "Hãy sắp xếp thời gian để hoàn thành công việc đúng kế hoạch.",
+      };
+      const dayMsg = DAY_MESSAGES[r.taskKey] ?? "Hãy sắp xếp thời gian để hoàn thành đúng lịch.";
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `📅 Nhắc lịch ngày mai: ${r.taskIcon} ${r.taskLabel}`,
+            body: r.customNote
+              ? `📌 ${r.customNote}\n⏰ ${formatDateVN(r.date)} lúc ${r.time}\n${dayMsg}`
+              : `⏰ ${formatDateVN(r.date)} lúc ${r.time}\n${dayMsg}`,
+            sound: true,
+          },
+          trigger: { seconds: Math.floor(dayBeforeMs / 1000) },
+        });
+      } catch {}
+    }
+
+    return mainNotifId;
   }
 
   // ── validate → show inline confirm ──────────────────────────
