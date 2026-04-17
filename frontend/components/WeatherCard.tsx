@@ -8,6 +8,7 @@ import React, { useState } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Modal, FlatList, ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { useWeatherContext } from "../contexts/WeatherContext";
 import {
@@ -95,6 +96,14 @@ export default function WeatherCard() {
   } = useWeatherContext();
 
   const [showPicker, setShowPicker] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+
+  // Nếu màn hình đủ rộng → dàn 7 ô đều (flex), ngược lại scroll ngang
+  const CARD_PADDING  = 32 + 16; // marginHorizontal*2 + grid padding*2
+  const MIN_CELL_W    = 80;
+  const useFlexGrid   = screenWidth - CARD_PADDING >= MIN_CELL_W * 7;
+  // Chiều rộng mỗi ô khi dùng flex (có gap 4px × 6 khoảng)
+  const flexCellW     = Math.floor((screenWidth - CARD_PADDING - 4 * 6) / 7);
 
   const updatedStr = lastUpdated
     ? new Date(lastUpdated).toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" })
@@ -187,11 +196,14 @@ export default function WeatherCard() {
         </View>
       )}
 
-      {/* ══ 7-DAY GRID — horizontal scroll, ô tối thiểu 80px ══ */}
+      {/* ══ 7-DAY GRID ══
+          Màn rộng (≥ 7×80px): dàn đều flex, không scroll
+          Màn hẹp (mobile): scroll ngang, ô cố định 100px          */}
       <ScrollView
-        horizontal
+        horizontal={!useFlexGrid}
+        scrollEnabled={!useFlexGrid}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.grid}
+        contentContainerStyle={[s.grid, useFlexGrid && s.gridFlex]}
       >
         {currentWeather.forecasts.map((f, i) => {
           const rc = RISK_COLOR[f.riskLevel];
@@ -201,6 +213,7 @@ export default function WeatherCard() {
           return (
             <View key={f.date} style={[
               s.cell,
+              useFlexGrid ? { flex: 1 } : { width: 100 },
               i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 2 },
             ]}>
               {/* Ngày */}
@@ -306,12 +319,17 @@ const s = StyleSheet.create({
   neighborDots: { flexDirection:"row", gap:2 },
   neighborRisk: { fontSize:10, fontWeight:"700" },
 
-  // ── 7-day grid (horizontal scroll) ──
+  // ── 7-day grid ──
   grid: {
-    paddingHorizontal:10, paddingVertical:10, gap:8,
+    paddingHorizontal:8, paddingVertical:8, gap:4,
+  },
+  gridFlex: {
+    // Khi dùng flex: ScrollView vẫn bọc ngoài nhưng không scroll
+    // alignSelf stretch để fill full width
+    alignSelf: "stretch",
   },
   cell: {
-    width:100,                    // ← fixed width, scroll để xem hết
+    // width set inline theo useFlexGrid
     alignItems:"center",
     backgroundColor:"#f7f7f7",
     borderRadius:12, paddingVertical:10, paddingHorizontal:8,

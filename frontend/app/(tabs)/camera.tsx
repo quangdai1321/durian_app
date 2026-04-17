@@ -15,6 +15,26 @@ import WeatherBanner from "../../components/WeatherBanner";
 
 type Mode = "choose" | "camera" | "loading";
 
+/**
+ * Convert bất kỳ URI (blob://, file://, data:) sang data URI ổn định.
+ * Blob URL trên web bị revoke khi navigate → phải convert ngay sau khi chụp.
+ */
+async function toStableDataUri(uri: string): Promise<string> {
+  if (uri.startsWith("data:")) return uri; // Đã là data URI, dùng luôn
+  try {
+    const resp = await fetch(uri);
+    const blob = await resp.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return uri; // fallback nếu convert thất bại
+  }
+}
+
 // On web: returns the File object directly (not dataURI)
 function pickFileWeb(): Promise<File | null> {
   return new Promise(resolve => {
@@ -144,7 +164,12 @@ export default function CameraScreen() {
     if (!cameraRef.current) return;
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-      if (photo) await diagnose(photo.uri);
+      if (!photo) return;
+      // Web: blob URL từ CameraView bị revoke khi navigate → convert sang data URI ngay
+      const stableUri = Platform.OS === "web"
+        ? await toStableDataUri(photo.uri)
+        : photo.uri;
+      await diagnose(stableUri);
     } catch (e: any) { setErrMsg(e.message || "Loi chup anh"); }
   };
 

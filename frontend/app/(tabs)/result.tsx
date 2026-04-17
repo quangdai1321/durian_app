@@ -152,8 +152,13 @@ export default function ResultScreen() {
                   : conf >= 50 ? "#f39c12"
                   : "#e74c3c";
 
-  const imgUri = diagnosis.image_data
-    || (diagnosis.image_url ? `${BASE_URL}${diagnosis.image_url}` : null);
+  // Ưu tiên: data URI từ DB → image_url → null (hiện placeholder)
+  // KHÔNG dùng image_url vì Railway ephemeral filesystem đã xóa file
+  const imgUri = diagnosis.image_data?.startsWith("data:")
+    ? diagnosis.image_data
+    : diagnosis.image_data || null;
+
+  const [imgError, setImgError] = useState(false);
 
   return (
     <AuthGuard>
@@ -176,22 +181,25 @@ export default function ResultScreen() {
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-          {/* ── Image preview (inline, no gap) ── */}
-          {imgUri ? (
+          {/* ── Image preview ── */}
+          {imgUri && !imgError ? (
             <View style={styles.imgCard}>
               <Image
                 source={{ uri: imgUri }}
                 style={styles.imgPreview}
                 resizeMode="cover"
+                onError={() => setImgError(true)}
               />
-              {/* Icon badge overlaid on bottom-right of image */}
               <View style={[styles.imgIconBadge, { backgroundColor: badge.bg }]}>
                 <Text style={{ fontSize: 22 }}>{icon}</Text>
               </View>
             </View>
           ) : (
             <View style={[styles.imgCard, styles.imgPlaceholder]}>
-              <Text style={{ fontSize: 64 }}>🌿</Text>
+              <Text style={{ fontSize: 48 }}>{icon}</Text>
+              <Text style={{ fontSize: 13, color: "#aaa", marginTop: 8 }}>
+                {imgError ? "Không tải được ảnh" : "Chưa có ảnh"}
+              </Text>
               <View style={[styles.imgIconBadge, { backgroundColor: badge.bg }]}>
                 <Text style={{ fontSize: 22 }}>{icon}</Text>
               </View>
