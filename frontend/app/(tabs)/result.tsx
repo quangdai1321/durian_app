@@ -43,6 +43,7 @@ export default function ResultScreen() {
   const [correctClass,      setCorrectClass]       = useState<string | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted]  = useState(false);
   const [submittingFb,      setSubmittingFb]       = useState(false);
+  const [imgError,          setImgError]           = useState(false);
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -55,6 +56,7 @@ export default function ResultScreen() {
     setCorrectClass(null);
     setFeedbackSubmitted(false);
     setSubmittingFb(false);
+    setImgError(false);
     fadeAnim.setValue(0);
     slideAnim.setValue(30);
     barAnim.setValue(0);
@@ -152,13 +154,10 @@ export default function ResultScreen() {
                   : conf >= 50 ? "#f39c12"
                   : "#e74c3c";
 
-  // Ưu tiên: data URI từ DB → image_url → null (hiện placeholder)
-  // KHÔNG dùng image_url vì Railway ephemeral filesystem đã xóa file
+  // Ưu tiên: data URI từ DB; bỏ qua image_url (Railway ephemeral đã xóa)
   const imgUri = diagnosis.image_data?.startsWith("data:")
     ? diagnosis.image_data
     : diagnosis.image_data || null;
-
-  const [imgError, setImgError] = useState(false);
 
   return (
     <AuthGuard>
