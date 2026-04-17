@@ -103,18 +103,18 @@ function getCurrentTime() {
 //  REMINDER MODAL
 // ════════════════════════════════════════════════════════════════
 function ReminderModal({
-  visible, onClose, prefillDate,
-}: { visible: boolean; onClose: () => void; prefillDate?: string }) {
+  visible, onClose, prefillDate, prefillTask,
+}: { visible: boolean; onClose: () => void; prefillDate?: string; prefillTask?: string }) {
   const [tab, setTab] = useState<"create" | "list">("create");
 
-  // Prefill date từ WeatherCard khi user nhấn "Đặt lịch phun thuốc"
+  // Prefill date + task từ WeatherCard khi user nhấn "Đặt lịch chăm sóc"
   useEffect(() => {
     if (visible && prefillDate) {
       setDate(prefillDate);
-      setTaskKey("phun_thuoc");
+      setTaskKey(prefillTask || "phun_thuoc");
       setTab("create");
     }
-  }, [visible, prefillDate]);
+  }, [visible, prefillDate, prefillTask]);
 
   // Form state
   const [taskKey,      setTaskKey]      = useState("phun_thuoc");
@@ -775,6 +775,7 @@ export default function TreatmentScreen() {
   const [selected, setSelected] = useState<string>("");
   const [showReminder,    setShowReminder]    = useState(false);
   const [reminderPrefill, setReminderPrefill] = useState<string | undefined>();
+  const [reminderTask,    setReminderTask]    = useState<string | undefined>();
 
   const [messages,    setMessages]    = useState<ChatMsg[]>([WELCOME_MSG()]);
   const [chatInput,   setChatInput]   = useState("");
@@ -907,8 +908,9 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
       >
         {/* ── Dự báo thời tiết 7 ngày ── */}
         <WeatherCard
-          onSchedulePress={(date) => {
+          onSchedulePress={(date, taskKey) => {
             setReminderPrefill(date);
+            setReminderTask(taskKey);
             setShowReminder(true);
           }}
         />
@@ -1068,7 +1070,8 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
       <ReminderModal
         visible={showReminder}
         prefillDate={reminderPrefill}
-        onClose={() => { setShowReminder(false); setReminderPrefill(undefined); }}
+        prefillTask={reminderTask}
+        onClose={() => { setShowReminder(false); setReminderPrefill(undefined); setReminderTask(undefined); }}
       />
     </KeyboardAvoidingView>
     </AuthGuard>
