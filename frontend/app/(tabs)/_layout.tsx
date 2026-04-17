@@ -2,9 +2,11 @@ import { View, StyleSheet } from "react-native";
 import { Tabs } from "expo-router";
 import { Colors } from "../../constants/Colors";
 import FloatingChat from "../../components/FloatingChat";
+import { WeatherProvider } from "../../contexts/WeatherContext";
 
 export default function TabLayout() {
   return (
+    <WeatherProvider>
     <View style={styles.root}>
       <Tabs
         screenOptions={{
@@ -50,6 +52,7 @@ export default function TabLayout() {
       {/* Global floating AI chat — always on top */}
       <FloatingChat />
     </View>
+    </WeatherProvider>
   );
 }
 

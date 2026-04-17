@@ -10,12 +10,13 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useWeather, RISK_COLOR, RISK_BG, weatherEmoji } from "../hooks/useWeather";
+import { useWeatherContext } from "../contexts/WeatherContext";
+import { RISK_COLOR, RISK_BG, weatherEmoji } from "../hooks/useWeather";
 import { Colors } from "../constants/Colors";
 
 export default function WeatherBanner() {
   const router = useRouter();
-  const { loading, error, currentProvince, currentWeather } = useWeather();
+  const { loading, error, currentProvince, currentWeather } = useWeatherContext();
 
   // Không hiển thị khi đang load lần đầu hoặc lỗi
   if (loading && !currentWeather) {

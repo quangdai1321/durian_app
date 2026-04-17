@@ -11,8 +11,9 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Modal, FlatList, ScrollView,
 } from "react-native";
+import { useWeatherContext } from "../contexts/WeatherContext";
 import {
-  useWeather, RISK_COLOR, RISK_BG, RISK_LABEL,
+  RISK_COLOR, RISK_BG, RISK_LABEL,
   weatherEmoji, PROVINCES, RiskLevel, ProvinceWeather,
 } from "../hooks/useWeather";
 import { Colors } from "../constants/Colors";
@@ -346,7 +347,7 @@ export default function WeatherCard({
     loading, error, currentProvince, currentWeather,
     neighborWeathers, lastUpdated, recommendation,
     refresh, changeProvince,
-  } = useWeather();
+  } = useWeatherContext();
 
   const [showPicker,    setShowPicker]    = useState(false);
   const [showNeighbors, setShowNeighbors] = useState(false);
