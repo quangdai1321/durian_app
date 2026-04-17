@@ -9,6 +9,7 @@ import { useRouter } from "expo-router";
 import { diseaseApi, chatApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
 import AuthGuard from "../../components/AuthGuard";
+import WeatherCard from "../../components/WeatherCard";
 
 // ── expo-notifications (chỉ mobile, không có trên web) ────────────
 let Notifications: any = null;
@@ -102,9 +103,18 @@ function getCurrentTime() {
 //  REMINDER MODAL
 // ════════════════════════════════════════════════════════════════
 function ReminderModal({
-  visible, onClose,
-}: { visible: boolean; onClose: () => void }) {
+  visible, onClose, prefillDate,
+}: { visible: boolean; onClose: () => void; prefillDate?: string }) {
   const [tab, setTab] = useState<"create" | "list">("create");
+
+  // Prefill date từ WeatherCard khi user nhấn "Đặt lịch phun thuốc"
+  useEffect(() => {
+    if (visible && prefillDate) {
+      setDate(prefillDate);
+      setTaskKey("phun_thuoc");
+      setTab("create");
+    }
+  }, [visible, prefillDate]);
 
   // Form state
   const [taskKey,      setTaskKey]      = useState("phun_thuoc");
@@ -763,7 +773,8 @@ export default function TreatmentScreen() {
   const [loading,  setLoading]  = useState(true);
   const [allList,  setAllList]  = useState<any[]>([]);
   const [selected, setSelected] = useState<string>("");
-  const [showReminder, setShowReminder] = useState(false);
+  const [showReminder,    setShowReminder]    = useState(false);
+  const [reminderPrefill, setReminderPrefill] = useState<string | undefined>();
 
   const [messages,    setMessages]    = useState<ChatMsg[]>([WELCOME_MSG()]);
   const [chatInput,   setChatInput]   = useState("");
@@ -894,6 +905,14 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Dự báo thời tiết 7 ngày ── */}
+        <WeatherCard
+          onSchedulePress={(date) => {
+            setReminderPrefill(date);
+            setShowReminder(true);
+          }}
+        />
+
         {disease && (
           <>
             {/* Hero card — tên bệnh hàng ngang để tiết kiệm diện tích */}
@@ -1046,7 +1065,11 @@ Trả lời ngắn gọn, thực tế bằng tiếng Việt. Nếu không liên 
       </ScrollView>
 
       {/* Reminder Modal */}
-      <ReminderModal visible={showReminder} onClose={() => setShowReminder(false)} />
+      <ReminderModal
+        visible={showReminder}
+        prefillDate={reminderPrefill}
+        onClose={() => { setShowReminder(false); setReminderPrefill(undefined); }}
+      />
     </KeyboardAvoidingView>
     </AuthGuard>
   );

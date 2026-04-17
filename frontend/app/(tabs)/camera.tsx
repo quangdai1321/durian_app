@@ -11,6 +11,7 @@ import { useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { diagnosisApi } from "../../services/api";
 import { Colors } from "../../constants/Colors";
+import WeatherBanner from "../../components/WeatherBanner";
 
 type Mode = "choose" | "camera" | "loading";
 
@@ -233,6 +234,10 @@ export default function CameraScreen() {
         <Text style={s.headerTitle}>🌿 Chẩn đoán bệnh lá sầu riêng</Text>
         <Text style={s.headerSub}>Chọn cách lấy ảnh để phân tích</Text>
       </View>
+
+      {/* ── Weather banner — tap to go to Treatment tab ── */}
+      <WeatherBanner />
+
       <ScrollView contentContainerStyle={s.chooseBody} showsVerticalScrollIndicator={false}>
         <View style={s.heroBox}>
           <Text style={s.heroTitle}>🔬 AI nhận diện bệnh lá sầu riêng</Text>
