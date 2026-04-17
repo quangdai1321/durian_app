@@ -1,8 +1,7 @@
 /**
- * WeatherCard.tsx — all-in-header version
- * Header chứa: tên tỉnh | khuyến nghị | thống kê + badge
- * Hàng 2 trong header: nguy cơ tỉnh lân cận (compact)
- * Bên dưới: chỉ còn 7-day grid + legend
+ * WeatherCard.tsx — mobile-friendly
+ * Header: 2 dòng (stats + province | recommendations | neighbors)
+ * Grid: horizontal scroll, ô tối thiểu 80px, nhãn đầy đủ
  */
 
 import React, { useState } from "react";
@@ -18,16 +17,12 @@ import {
 import { Colors } from "../constants/Colors";
 
 // ─── Helpers ─────────────────────────────────────────────────
-function dayLabel(dateStr: string, idx: number): string {
-  if (idx === 0) return "Hôm\nnay";
-  if (idx === 1) return "Mai";
+function shortDay(dateStr: string, idx: number): string {
+  if (idx === 0) return "Hôm nay";
+  if (idx === 1) return "Ngày mai";
   const d   = new Date(dateStr + "T00:00:00");
   const dow = ["CN","T2","T3","T4","T5","T6","T7"][d.getDay()];
-  return `${dow}\n${d.getDate()}/${d.getMonth()+1}`;
-}
-
-function RiskDot({ level, size = 7 }: { level: RiskLevel; size?: number }) {
-  return <View style={{ width:size, height:size, borderRadius:size/2, backgroundColor:RISK_COLOR[level] }} />;
+  return `${dow} ${d.getDate()}/${d.getMonth()+1}`;
 }
 
 // ─── Province picker modal ────────────────────────────────────
@@ -83,7 +78,6 @@ export default function WeatherCard() {
     ? new Date(lastUpdated).toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" })
     : "--";
 
-  // ── Loading ──
   if (loading && !currentWeather) {
     return (
       <View style={s.card}>
@@ -109,64 +103,60 @@ export default function WeatherCard() {
   const riskC = RISK_COLOR[currentWeather.weekRisk];
   const riskB = RISK_BG[currentWeather.weekRisk];
 
-  // Lấy tối đa 2 dòng khuyến nghị quan trọng nhất
-  const topTips = recommendation.slice(0, 2);
-
   return (
     <View style={[s.card, { borderColor: riskC }]}>
 
-      {/* ══════════════════════════════════════════════════════
-          HEADER — 3 cột: [tỉnh] [khuyến nghị] [stats+badge]
-          ══════════════════════════════════════════════════ */}
-      <View style={[s.header, { backgroundColor: riskB }]}>
-
-        {/* Cột trái: title + province */}
-        <View style={s.hdrLeft}>
-          <Text style={s.hdrTitle}>🌦️ Dự báo 7 ngày</Text>
+      {/* ══ HEADER DÒNG 1: province + stats + badge ══ */}
+      <View style={[s.hdr1, { backgroundColor: riskB }]}>
+        {/* Trái: title + province */}
+        <View style={s.hdr1Left}>
+          <Text style={s.hdrTitle}>🌦️ Dự báo thời tiết 7 ngày</Text>
           <TouchableOpacity onPress={() => setShowPicker(true)}>
             <Text style={[s.provinceTxt, { color: riskC }]}>📍 {currentProvince} ▾</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Cột giữa: khuyến nghị tuần */}
-        <View style={s.hdrMid}>
-          <Text style={s.hdrMidLabel}>💡 Khuyến nghị</Text>
-          {topTips.map((tip, i) => (
-            <Text key={i} style={s.hdrMidTip} numberOfLines={2}>{tip}</Text>
-          ))}
-        </View>
-
-        {/* Cột phải: stats + badge + refresh */}
-        <View style={s.hdrRight}>
-          <View style={s.pill}><Text style={s.pillTxt}>🌧️ {currentWeather.rainDays}/7</Text></View>
-          <View style={s.pill}><Text style={s.pillTxt}>💧 {currentWeather.avgHumidity}%</Text></View>
+        {/* Phải: pills + badge + refresh */}
+        <View style={s.hdr1Right}>
+          <View style={s.pill}><Text style={s.pillTxt}>🌧️ {currentWeather.rainDays}/7 ngày mưa</Text></View>
+          <View style={s.pill}><Text style={s.pillTxt}>💧 {currentWeather.avgHumidity}% ẩm</Text></View>
           <View style={[s.riskBadge, { backgroundColor: riskC }]}>
             <Text style={s.riskBadgeTxt}>{RISK_LABEL[currentWeather.weekRisk]}</Text>
           </View>
           <TouchableOpacity onPress={refresh} hitSlop={{top:8,bottom:8,left:8,right:8}}>
-            <Text style={{ fontSize:15 }}>🔄</Text>
+            <Text style={{ fontSize:16 }}>🔄</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ══════════════════════════════════════════════════════
-          HEADER ROW 2 — Nguy cơ tỉnh lân cận (nếu có)
-          Nằm trong cùng vùng màu header, compact 1 dòng scroll
-          ══════════════════════════════════════════════════ */}
+      {/* ══ HEADER DÒNG 2: khuyến nghị (full width) ══ */}
+      {recommendation.length > 0 && (
+        <View style={[s.hdr2, { backgroundColor: riskB }]}>
+          <Text style={s.hdr2Label}>💡 Khuyến nghị:</Text>
+          {recommendation.slice(0, 2).map((tip, i) => (
+            <Text key={i} style={s.hdr2Tip}>{tip}</Text>
+          ))}
+        </View>
+      )}
+
+      {/* ══ HEADER DÒNG 3: tỉnh lân cận (horizontal scroll) ══ */}
       {neighborWeathers.length > 0 && (
-        <View style={[s.neighborBar, { backgroundColor: riskB }]}>
-          <Text style={[s.neighborBarLabel, { color: riskC }]}>Lân cận:</Text>
+        <View style={[s.hdr3, { backgroundColor: riskB }]}>
+          <Text style={[s.hdr3Label, { color: riskC }]}>Lân cận:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.neighborScroll}>
-            {neighborWeathers.map(pw => (
+            contentContainerStyle={s.hdr3Scroll}>
+            {neighborWeathers.map((pw: ProvinceWeather) => (
               <View key={pw.province} style={s.neighborChip}>
-                <Text style={s.neighborChipName}>{pw.province}</Text>
+                <Text style={s.neighborName}>{pw.province}</Text>
                 <View style={s.neighborDots}>
                   {pw.forecasts.map(f => (
-                    <RiskDot key={f.date} level={f.riskLevel} size={6} />
+                    <View key={f.date} style={{
+                      width:6, height:6, borderRadius:3,
+                      backgroundColor: RISK_COLOR[f.riskLevel],
+                    }}/>
                   ))}
                 </View>
-                <Text style={[s.neighborChipBadge, { color: RISK_COLOR[pw.weekRisk] }]}>
+                <Text style={[s.neighborRisk, { color: RISK_COLOR[pw.weekRisk] }]}>
                   {pw.weekRisk==="very_high"?"Rất cao":pw.weekRisk==="high"?"Cao":pw.weekRisk==="medium"?"TB":"Thấp"}
                 </Text>
               </View>
@@ -175,10 +165,12 @@ export default function WeatherCard() {
         </View>
       )}
 
-      {/* ══════════════════════════════════════════════════════
-          7-DAY GRID
-          ══════════════════════════════════════════════════ */}
-      <View style={s.grid}>
+      {/* ══ 7-DAY GRID — horizontal scroll, ô tối thiểu 80px ══ */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.grid}
+      >
         {currentWeather.forecasts.map((f, i) => {
           const rc = RISK_COLOR[f.riskLevel];
           const rb = RISK_BG[f.riskLevel];
@@ -189,51 +181,51 @@ export default function WeatherCard() {
           return (
             <View key={f.date} style={[
               s.cell,
-              i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 1.5 },
+              i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 2 },
             ]}>
               {/* Ngày */}
-              <Text style={[s.cellDow, i===0 && { color: rc, fontWeight:"800" }]}
-                numberOfLines={2} textBreakStrategy="simple">
-                {dayLabel(f.date, i)}
+              <Text style={[s.cellDow, i===0 && { color: rc, fontWeight:"800" }]}>
+                {shortDay(f.date, i)}
               </Text>
 
-              {/* Icon thời tiết */}
+              {/* Icon */}
               <Text style={s.cellEmoji}>{weatherEmoji(f.weatherCode)}</Text>
 
-              {/* Nhiệt độ max / min */}
-              <View style={s.cellTempRow}>
+              {/* Nhiệt độ */}
+              <View style={s.cellRow}>
                 <Text style={[s.cellTempMax, i===0 && { color: rc }]}>{f.tempMax}°</Text>
+                <Text style={s.cellSlash}>/</Text>
                 <Text style={s.cellTempMin}>{f.tempMin}°</Text>
               </View>
-              <Text style={s.cellLabel}>cao/thấp</Text>
+              <Text style={s.cellSubLabel}>nhiệt độ (cao/thấp)</Text>
 
               {/* Độ ẩm */}
-              <View style={s.cellInfoRow}>
-                <Text style={s.cellInfoIcon}>💧</Text>
-                <Text style={s.cellInfoVal}>{f.humidity}%</Text>
+              <View style={s.cellRow}>
+                <Text style={s.cellIcon}>💧</Text>
+                <Text style={s.cellVal}>{f.humidity}%</Text>
               </View>
-              <Text style={s.cellLabel}>độ ẩm</Text>
+              <Text style={s.cellSubLabel}>độ ẩm không khí</Text>
 
               {/* Lượng mưa */}
-              <View style={s.cellInfoRow}>
-                <Text style={s.cellInfoIcon}>{f.rain > 0 ? "🌧" : "☀️"}</Text>
-                <Text style={[s.cellInfoVal, f.rain > 0 && { color:"#1976d2" }]}>
-                  {f.rain > 0 ? `${f.rain}mm` : "Khô"}
+              <View style={s.cellRow}>
+                <Text style={s.cellIcon}>{f.rain > 0 ? "🌧" : "☀️"}</Text>
+                <Text style={[s.cellVal, f.rain > 0 && { color:"#1976d2" }]}>
+                  {f.rain > 0 ? `${f.rain} mm` : "Không mưa"}
                 </Text>
               </View>
-              <Text style={s.cellLabel}>mưa</Text>
+              <Text style={s.cellSubLabel}>lượng mưa</Text>
 
               {/* Risk chip */}
               <View style={[s.riskChip, { backgroundColor: rc }]}>
-                <Text style={s.riskChipTxt}>{riskLabel}</Text>
+                <Text style={s.riskChipTxt}>⚠ Nguy cơ: {riskLabel}</Text>
               </View>
             </View>
           );
         })}
-      </View>
+      </ScrollView>
 
-      {/* ── Footer: cập nhật ── */}
-      <Text style={s.updatedTxt}>🕐 Cập nhật lúc {updatedStr}</Text>
+      {/* ── Footer ── */}
+      <Text style={s.footer}>🕐 Cập nhật lúc {updatedStr}  ·  Nguồn: Open-Meteo</Text>
 
       <ProvincePicker
         visible={showPicker}
@@ -257,82 +249,75 @@ const s = StyleSheet.create({
     elevation:3,
   },
 
-  // ── Header row 1 ──
-  header: {
-    flexDirection:"row", alignItems:"stretch",
-    paddingHorizontal:12, paddingTop:10, paddingBottom:10,
-    gap:10,
-  },
-  hdrLeft: {
-    justifyContent:"center", minWidth:90,
-  },
-  hdrTitle:    { fontSize:11, fontWeight:"700", color:Colors.text, marginBottom:3 },
-  provinceTxt: { fontSize:13, fontWeight:"800" },
-
-  hdrMid: {
-    flex:1, justifyContent:"center",
-    borderLeftWidth:1, borderRightWidth:1,
-    borderColor:"rgba(0,0,0,.08)",
-    paddingHorizontal:10,
-  },
-  hdrMidLabel: { fontSize:10, fontWeight:"700", color:Colors.primary, marginBottom:3 },
-  hdrMidTip:   { fontSize:10, color:Colors.text, lineHeight:14, marginBottom:1 },
-
-  hdrRight: {
+  // ── Header dòng 1 ──
+  hdr1: {
     flexDirection:"row", alignItems:"center",
-    flexWrap:"wrap", gap:5, justifyContent:"flex-end",
-    maxWidth:160,
-  },
-  pill:         { backgroundColor:"rgba(0,0,0,.07)", borderRadius:20, paddingHorizontal:7, paddingVertical:3 },
-  pillTxt:      { fontSize:9, fontWeight:"600", color:Colors.text },
-  riskBadge:    { borderRadius:20, paddingHorizontal:8, paddingVertical:3 },
-  riskBadgeTxt: { color:"#fff", fontSize:9, fontWeight:"700" },
-
-  // ── Header row 2 — neighbors ──
-  neighborBar: {
-    flexDirection:"row", alignItems:"center",
-    paddingHorizontal:12, paddingBottom:9,
+    paddingHorizontal:12, paddingVertical:10,
     gap:8,
+  },
+  hdr1Left:  { flex:1 },
+  hdr1Right: { flexDirection:"row", alignItems:"center", flexWrap:"wrap", gap:5, maxWidth:"55%", justifyContent:"flex-end" },
+  hdrTitle:    { fontSize:11, fontWeight:"700", color:Colors.text, marginBottom:3 },
+  provinceTxt: { fontSize:14, fontWeight:"800" },
+  pill:         { backgroundColor:"rgba(0,0,0,.07)", borderRadius:20, paddingHorizontal:8, paddingVertical:3 },
+  pillTxt:      { fontSize:10, fontWeight:"600", color:Colors.text },
+  riskBadge:    { borderRadius:20, paddingHorizontal:9, paddingVertical:4 },
+  riskBadgeTxt: { color:"#fff", fontSize:10, fontWeight:"700" },
+
+  // ── Header dòng 2 — khuyến nghị ──
+  hdr2: {
+    paddingHorizontal:12, paddingBottom:8,
     borderTopWidth:1, borderTopColor:"rgba(0,0,0,.07)",
   },
-  neighborBarLabel: { fontSize:10, fontWeight:"700", flexShrink:0 },
-  neighborScroll:   { gap:12, alignItems:"center" },
-  neighborChip:     { flexDirection:"row", alignItems:"center", gap:4 },
-  neighborChipName: { fontSize:10, fontWeight:"600", color:Colors.text },
-  neighborDots:     { flexDirection:"row", gap:2 },
-  neighborChipBadge:{ fontSize:10, fontWeight:"700" },
+  hdr2Label: { fontSize:11, fontWeight:"700", color:Colors.primary, marginBottom:4 },
+  hdr2Tip:   { fontSize:11, color:Colors.text, lineHeight:17, marginBottom:2 },
 
-  // ── 7-day grid ──
+  // ── Header dòng 3 — lân cận ──
+  hdr3: {
+    flexDirection:"row", alignItems:"center",
+    paddingHorizontal:12, paddingBottom:9,
+    borderTopWidth:1, borderTopColor:"rgba(0,0,0,.07)",
+    gap:6,
+  },
+  hdr3Label:  { fontSize:10, fontWeight:"700", flexShrink:0 },
+  hdr3Scroll: { gap:12, alignItems:"center" },
+  neighborChip: { flexDirection:"row", alignItems:"center", gap:4 },
+  neighborName: { fontSize:10, fontWeight:"600", color:Colors.text },
+  neighborDots: { flexDirection:"row", gap:2 },
+  neighborRisk: { fontSize:10, fontWeight:"700" },
+
+  // ── 7-day grid (horizontal scroll) ──
   grid: {
-    flexDirection:"row",
-    paddingHorizontal:8, paddingVertical:8, gap:4,
+    paddingHorizontal:10, paddingVertical:10, gap:8,
   },
   cell: {
-    flex:1, alignItems:"center",
+    width:100,                    // ← fixed width, scroll để xem hết
+    alignItems:"center",
     backgroundColor:"#f7f7f7",
-    borderRadius:10, paddingVertical:7, paddingHorizontal:2,
+    borderRadius:12, paddingVertical:10, paddingHorizontal:8,
     borderWidth:1, borderColor:"#ebebeb",
-    gap:2,
+    gap:1,
   },
-  cellDow:      { fontSize:9, fontWeight:"700", color:Colors.textMuted, textAlign:"center", lineHeight:12 },
-  cellEmoji:    { fontSize:18, marginVertical:2 },
+  cellDow:      { fontSize:11, fontWeight:"700", color:Colors.textMuted, textAlign:"center", marginBottom:4 },
+  cellEmoji:    { fontSize:22, marginBottom:4 },
 
-  cellTempRow:  { flexDirection:"row", alignItems:"baseline", gap:3 },
-  cellTempMax:  { fontSize:13, fontWeight:"900", color:Colors.text },
-  cellTempMin:  { fontSize:10, fontWeight:"500", color:Colors.textMuted },
-
-  cellInfoRow:  { flexDirection:"row", alignItems:"center", gap:2, marginTop:4 },
-  cellInfoIcon: { fontSize:10 },
-  cellInfoVal:  { fontSize:10, fontWeight:"700", color:Colors.text },
-  cellLabel:    { fontSize:8, color:Colors.textMuted, marginTop:1 },
+  cellRow:      { flexDirection:"row", alignItems:"baseline", gap:2, marginTop:5 },
+  cellTempMax:  { fontSize:15, fontWeight:"900", color:Colors.text },
+  cellSlash:    { fontSize:11, color:Colors.textMuted },
+  cellTempMin:  { fontSize:11, fontWeight:"500", color:Colors.textMuted },
+  cellIcon:     { fontSize:12 },
+  cellVal:      { fontSize:12, fontWeight:"700", color:Colors.text },
+  cellSubLabel: { fontSize:9, color:Colors.textMuted, textAlign:"center", marginBottom:1 },
 
   riskChip: {
-    marginTop:5, borderRadius:8,
-    paddingHorizontal:5, paddingVertical:2,
+    marginTop:7, borderRadius:8,
+    paddingHorizontal:7, paddingVertical:3,
+    alignSelf:"stretch", alignItems:"center",
   },
-  riskChipTxt: { fontSize:8, fontWeight:"800", color:"#fff", textAlign:"center" },
+  riskChipTxt: { fontSize:9, fontWeight:"800", color:"#fff" },
 
-  updatedTxt:  { fontSize:9, color:Colors.textMuted, textAlign:"center", paddingBottom:7 },
+  // ── Footer ──
+  footer: { fontSize:9, color:Colors.textMuted, textAlign:"center", paddingBottom:8 },
 
   // ── States ──
   skRow:    { flexDirection:"row", alignItems:"center", gap:10, padding:16 },
