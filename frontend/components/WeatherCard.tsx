@@ -16,6 +16,28 @@ import {
 } from "../hooks/useWeather";
 import { Colors } from "../constants/Colors";
 
+// ─── Disease warning từ điều kiện thời tiết ─────────────────
+function diseaseWarning(temp: number, humidity: number, rain: number)
+  : { text: string; color: string } {
+  // Mưa nhiều + ẩm cao + nhiệt độ lý tưởng → Cháy lá + Thán thư
+  if (rain > 10 && humidity > 85 && temp >= 24 && temp <= 32)
+    return { text: "⚠ Cháy lá · Thán thư", color: "#c62828" };
+  // Mưa vừa + ẩm cao → Cháy lá
+  if (rain > 5 && humidity > 80)
+    return { text: "⚠ Cháy lá", color: "#e53935" };
+  // Ẩm cao, ít mưa → Đốm tảo + Rhizoctonia
+  if (humidity > 85 && rain <= 2)
+    return { text: "⚠ Đốm tảo · Rhizoctonia", color: "#f57c00" };
+  // Ẩm trung bình, mưa nhẹ → Thán thư
+  if (humidity > 78 && rain > 0)
+    return { text: "⚡ Thán thư", color: "#fb8c00" };
+  // Khô hạn → Khô đầu lá (Phomopsis)
+  if (rain < 1 && humidity < 60)
+    return { text: "⚠ Khô đầu lá", color: "#f57c00" };
+  // Bình thường
+  return { text: "✅ Ít nguy cơ bệnh lá", color: "#388e3c" };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 function shortDay(dateStr: string, idx: number): string {
   if (idx === 0) return "Hôm nay";
@@ -174,10 +196,8 @@ export default function WeatherCard() {
         {currentWeather.forecasts.map((f, i) => {
           const rc = RISK_COLOR[f.riskLevel];
           const rb = RISK_BG[f.riskLevel];
-          const riskLabel =
-            f.riskLevel === "very_high" ? "Rất cao" :
-            f.riskLevel === "high"      ? "Cao"     :
-            f.riskLevel === "medium"    ? "TB"      : "Thấp";
+          const avgTemp = (f.tempMax + f.tempMin) / 2;
+          const dw = diseaseWarning(avgTemp, f.humidity, f.rain);
           return (
             <View key={f.date} style={[
               s.cell,
@@ -215,9 +235,9 @@ export default function WeatherCard() {
               </View>
               <Text style={s.cellSubLabel}>lượng mưa</Text>
 
-              {/* Risk chip */}
-              <View style={[s.riskChip, { backgroundColor: rc }]}>
-                <Text style={s.riskChipTxt}>⚠ Nguy cơ: {riskLabel}</Text>
+              {/* Disease warning chip */}
+              <View style={[s.riskChip, { backgroundColor: dw.color }]}>
+                <Text style={s.riskChipTxt} numberOfLines={2}>{dw.text}</Text>
               </View>
             </View>
           );
