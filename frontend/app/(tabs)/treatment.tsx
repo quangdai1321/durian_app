@@ -390,15 +390,24 @@ function ReminderModal({
               </TouchableOpacity>
             )}
 
-            {/* Web: manual text input date */}
+            {/* Web: native HTML date picker */}
             {Platform.OS === "web" && (
-              <TextInput
-                style={ms.dateInput}
+              // @ts-ignore
+              <input
+                type="date"
                 value={date}
-                onChangeText={v => setDate(v.replace(/[^\d-]/g, "").slice(0, 10))}
-                placeholder="YYYY-MM-DD  (vd: 2026-06-20)"
-                placeholderTextColor="#aaa"
-                maxLength={10}
+                min={getDateStr(0)}
+                onChange={(e: any) => setDate(e.target.value)}
+                style={{
+                  marginTop: 6, marginBottom: 2,
+                  border: `1.5px solid ${Colors.border}`,
+                  borderRadius: 10, padding: "10px 14px",
+                  fontSize: 14, color: Colors.text,
+                  backgroundColor: Colors.bg,
+                  width: "100%", fontWeight: "600",
+                  outline: "none", cursor: "pointer",
+                  boxSizing: "border-box",
+                } as any}
               />
             )}
 
@@ -450,15 +459,23 @@ function ReminderModal({
               </TouchableOpacity>
             )}
 
-            {/* Web: manual text input time */}
+            {/* Web: native HTML time picker */}
             {Platform.OS === "web" && (
-              <TextInput
-                style={ms.dateInput}
+              // @ts-ignore
+              <input
+                type="time"
                 value={time}
-                onChangeText={v => setTime(v.replace(/[^\d:]/g, "").slice(0, 5))}
-                placeholder="HH:MM  (vd: 07:30)"
-                placeholderTextColor="#aaa"
-                maxLength={5}
+                onChange={(e: any) => setTime(e.target.value)}
+                style={{
+                  marginTop: 6, marginBottom: 2,
+                  border: `1.5px solid ${Colors.border}`,
+                  borderRadius: 10, padding: "10px 14px",
+                  fontSize: 14, color: Colors.text,
+                  backgroundColor: Colors.bg,
+                  width: "100%", fontWeight: "600",
+                  outline: "none", cursor: "pointer",
+                  boxSizing: "border-box",
+                } as any}
               />
             )}
 
@@ -1288,11 +1305,70 @@ const ms = StyleSheet.create({
   previewRepeat:   { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
 
   // Save button
+  // Form error
+  formErrorBox: {
+    backgroundColor: "#fff0f0", borderRadius: 10, borderWidth: 1,
+    borderColor: "#ffcdd2", padding: 12, marginTop: 10,
+  },
+  formErrorText: { color: "#c62828", fontSize: 13, fontWeight: "600" },
+
+  // Inline confirm card
+  confirmCard: {
+    marginTop: 16, backgroundColor: "#f0f9f0",
+    borderRadius: 16, borderWidth: 1.5, borderColor: "#a5d6a7",
+    padding: 16,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
+  },
+  confirmTitle: {
+    fontSize: 13, fontWeight: "800", color: Colors.primary,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12,
+  },
+  confirmPreviewRow:  { flexDirection: "row", alignItems: "flex-start", marginBottom: 14 },
+  confirmTaskName:    { fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 2 },
+  confirmNote:        { fontSize: 12, color: Colors.textMuted, marginBottom: 4 },
+  confirmDate:        { fontSize: 13, fontWeight: "700", color: Colors.primary, marginBottom: 3 },
+  confirmRepeat:      { fontSize: 12, color: Colors.textMuted },
+  confirmBtnRow:      { flexDirection: "row", gap: 10 },
+  confirmCancelBtn: {
+    flex: 1, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border,
+    paddingVertical: 12, alignItems: "center", backgroundColor: "#fff",
+  },
+  confirmCancelText:  { color: Colors.textMuted, fontWeight: "700", fontSize: 14 },
+  confirmOkBtn: {
+    flex: 2, borderRadius: 12, backgroundColor: Colors.primary,
+    paddingVertical: 12, alignItems: "center",
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+  },
+  confirmOkText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+
+  // Inline delete confirm
+  inlineDeleteConfirm: {
+    marginTop: 10, backgroundColor: "#fff8f8",
+    borderRadius: 10, borderWidth: 1, borderColor: "#ffcdd2", padding: 10,
+  },
+  inlineDeleteText:    { fontSize: 12, fontWeight: "700", color: "#c62828", marginBottom: 8 },
+  inlineDeleteBtns:    { flexDirection: "row", gap: 8 },
+  inlineDeleteCancel: {
+    flex: 1, borderRadius: 8, borderWidth: 1, borderColor: Colors.border,
+    paddingVertical: 7, alignItems: "center", backgroundColor: "#fff",
+  },
+  inlineDeleteCancelText: { color: Colors.textMuted, fontWeight: "600", fontSize: 12 },
+  inlineDeleteOk: {
+    flex: 1, borderRadius: 8, backgroundColor: "#e53935",
+    paddingVertical: 7, alignItems: "center",
+  },
+  inlineDeleteOkText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+
+  // Save button
   saveBtn: {
     marginTop: 20, backgroundColor: Colors.primary,
     borderRadius: 14, padding: 16, alignItems: "center",
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
   },
-  saveBtnDisabled: { backgroundColor: "#aaa" },
+  saveBtnDisabled: { backgroundColor: "#aaa", shadowOpacity: 0 },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
   // List
