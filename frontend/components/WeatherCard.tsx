@@ -109,6 +109,48 @@ export default function WeatherCard() {
     ? new Date(lastUpdated).toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" })
     : "--";
 
+  // Render danh sách ô — dùng chung cho cả flex và scroll
+  const renderCells = (forecasts: typeof currentWeather.forecasts, flex: boolean) =>
+    forecasts.map((f, i) => {
+      const rc = RISK_COLOR[f.riskLevel];
+      const rb = RISK_BG[f.riskLevel];
+      const avgTemp = (f.tempMax + f.tempMin) / 2;
+      const dw = diseaseWarning(avgTemp, f.humidity, f.rain);
+      return (
+        <View key={f.date} style={[
+          s.cell,
+          flex ? { flex: 1 } : { width: 100 },
+          i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 2 },
+        ]}>
+          <Text style={[s.cellDow, i===0 && { color: rc, fontWeight:"800" }]}>
+            {shortDay(f.date, i)}
+          </Text>
+          <Text style={s.cellEmoji}>{weatherEmoji(f.weatherCode)}</Text>
+          <View style={s.cellRow}>
+            <Text style={[s.cellTempMax, i===0 && { color: rc }]}>{f.tempMax}°</Text>
+            <Text style={s.cellSlash}>/</Text>
+            <Text style={s.cellTempMin}>{f.tempMin}°</Text>
+          </View>
+          <Text style={s.cellSubLabel}>nhiệt độ (cao/thấp)</Text>
+          <View style={s.cellRow}>
+            <Text style={s.cellIcon}>💧</Text>
+            <Text style={s.cellVal}>{f.humidity}%</Text>
+          </View>
+          <Text style={s.cellSubLabel}>độ ẩm không khí</Text>
+          <View style={s.cellRow}>
+            <Text style={s.cellIcon}>{f.rain > 0 ? "🌧" : "☀️"}</Text>
+            <Text style={[s.cellVal, f.rain > 0 && { color:"#1976d2" }]}>
+              {f.rain > 0 ? `${f.rain} mm` : "Không mưa"}
+            </Text>
+          </View>
+          <Text style={s.cellSubLabel}>lượng mưa</Text>
+          <View style={[s.riskChip, { backgroundColor: dw.color }]}>
+            <Text style={s.riskChipTxt} numberOfLines={2}>{dw.text}</Text>
+          </View>
+        </View>
+      );
+    });
+
   if (loading && !currentWeather) {
     return (
       <View style={s.card}>
@@ -197,65 +239,18 @@ export default function WeatherCard() {
       )}
 
       {/* ══ 7-DAY GRID ══
-          Màn rộng (≥ 7×80px): dàn đều flex, không scroll
-          Màn hẹp (mobile): scroll ngang, ô cố định 100px          */}
-      <ScrollView
-        horizontal={!useFlexGrid}
-        scrollEnabled={!useFlexGrid}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[s.grid, useFlexGrid && s.gridFlex]}
-      >
-        {currentWeather.forecasts.map((f, i) => {
-          const rc = RISK_COLOR[f.riskLevel];
-          const rb = RISK_BG[f.riskLevel];
-          const avgTemp = (f.tempMax + f.tempMin) / 2;
-          const dw = diseaseWarning(avgTemp, f.humidity, f.rain);
-          return (
-            <View key={f.date} style={[
-              s.cell,
-              useFlexGrid ? { flex: 1 } : { width: 100 },
-              i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 2 },
-            ]}>
-              {/* Ngày */}
-              <Text style={[s.cellDow, i===0 && { color: rc, fontWeight:"800" }]}>
-                {shortDay(f.date, i)}
-              </Text>
-
-              {/* Icon */}
-              <Text style={s.cellEmoji}>{weatherEmoji(f.weatherCode)}</Text>
-
-              {/* Nhiệt độ */}
-              <View style={s.cellRow}>
-                <Text style={[s.cellTempMax, i===0 && { color: rc }]}>{f.tempMax}°</Text>
-                <Text style={s.cellSlash}>/</Text>
-                <Text style={s.cellTempMin}>{f.tempMin}°</Text>
-              </View>
-              <Text style={s.cellSubLabel}>nhiệt độ (cao/thấp)</Text>
-
-              {/* Độ ẩm */}
-              <View style={s.cellRow}>
-                <Text style={s.cellIcon}>💧</Text>
-                <Text style={s.cellVal}>{f.humidity}%</Text>
-              </View>
-              <Text style={s.cellSubLabel}>độ ẩm không khí</Text>
-
-              {/* Lượng mưa */}
-              <View style={s.cellRow}>
-                <Text style={s.cellIcon}>{f.rain > 0 ? "🌧" : "☀️"}</Text>
-                <Text style={[s.cellVal, f.rain > 0 && { color:"#1976d2" }]}>
-                  {f.rain > 0 ? `${f.rain} mm` : "Không mưa"}
-                </Text>
-              </View>
-              <Text style={s.cellSubLabel}>lượng mưa</Text>
-
-              {/* Disease warning chip */}
-              <View style={[s.riskChip, { backgroundColor: dw.color }]}>
-                <Text style={s.riskChipTxt} numberOfLines={2}>{dw.text}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+          Màn rộng: View hàng ngang flex, ô tự co dãn
+          Màn hẹp:  ScrollView ngang, ô cố định 100px   */}
+      {useFlexGrid ? (
+        <View style={s.grid}>
+          {renderCells(currentWeather.forecasts, true)}
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.grid}>
+          {renderCells(currentWeather.forecasts, false)}
+        </ScrollView>
+      )}
 
       {/* ── Footer ── */}
       <Text style={s.footer}>🕐 Cập nhật lúc {updatedStr}  ·  Nguồn: Open-Meteo</Text>
@@ -321,15 +316,11 @@ const s = StyleSheet.create({
 
   // ── 7-day grid ──
   grid: {
+    flexDirection: "row",          // ← luôn hàng ngang
     paddingHorizontal:8, paddingVertical:8, gap:4,
   },
-  gridFlex: {
-    // Khi dùng flex: ScrollView vẫn bọc ngoài nhưng không scroll
-    // alignSelf stretch để fill full width
-    alignSelf: "stretch",
-  },
   cell: {
-    // width set inline theo useFlexGrid
+    // width / flex set inline theo useFlexGrid
     alignItems:"center",
     backgroundColor:"#f7f7f7",
     borderRadius:12, paddingVertical:10, paddingHorizontal:8,
