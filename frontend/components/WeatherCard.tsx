@@ -27,9 +27,7 @@ function dayLabel(dateStr: string, idx: number): string {
 }
 
 function RiskDot({ level, size = 7 }: { level: RiskLevel; size?: number }) {
-  return (
-    <View style={{ width:size, height:size, borderRadius:size/2, backgroundColor:RISK_COLOR[level] }} />
-  );
+  return <View style={{ width:size, height:size, borderRadius:size/2, backgroundColor:RISK_COLOR[level] }} />;
 }
 
 // ─── Province picker modal ────────────────────────────────────
@@ -184,40 +182,58 @@ export default function WeatherCard() {
         {currentWeather.forecasts.map((f, i) => {
           const rc = RISK_COLOR[f.riskLevel];
           const rb = RISK_BG[f.riskLevel];
+          const riskLabel =
+            f.riskLevel === "very_high" ? "Rất cao" :
+            f.riskLevel === "high"      ? "Cao"     :
+            f.riskLevel === "medium"    ? "TB"      : "Thấp";
           return (
             <View key={f.date} style={[
               s.cell,
               i === 0 && { backgroundColor: rb, borderColor: rc, borderWidth: 1.5 },
             ]}>
+              {/* Ngày */}
               <Text style={[s.cellDow, i===0 && { color: rc, fontWeight:"800" }]}
                 numberOfLines={2} textBreakStrategy="simple">
                 {dayLabel(f.date, i)}
               </Text>
+
+              {/* Icon thời tiết */}
               <Text style={s.cellEmoji}>{weatherEmoji(f.weatherCode)}</Text>
-              <Text style={s.cellTemp}>{f.tempMax}°</Text>
-              <Text style={s.cellHum}>{f.humidity}%</Text>
-              {f.rain > 0
-                ? <Text style={s.cellRain}>{f.rain}mm</Text>
-                : <View style={{ height:11 }} />
-              }
-              <RiskDot level={f.riskLevel} size={6} />
+
+              {/* Nhiệt độ max / min */}
+              <View style={s.cellTempRow}>
+                <Text style={[s.cellTempMax, i===0 && { color: rc }]}>{f.tempMax}°</Text>
+                <Text style={s.cellTempMin}>{f.tempMin}°</Text>
+              </View>
+              <Text style={s.cellLabel}>cao/thấp</Text>
+
+              {/* Độ ẩm */}
+              <View style={s.cellInfoRow}>
+                <Text style={s.cellInfoIcon}>💧</Text>
+                <Text style={s.cellInfoVal}>{f.humidity}%</Text>
+              </View>
+              <Text style={s.cellLabel}>độ ẩm</Text>
+
+              {/* Lượng mưa */}
+              <View style={s.cellInfoRow}>
+                <Text style={s.cellInfoIcon}>{f.rain > 0 ? "🌧" : "☀️"}</Text>
+                <Text style={[s.cellInfoVal, f.rain > 0 && { color:"#1976d2" }]}>
+                  {f.rain > 0 ? `${f.rain}mm` : "Khô"}
+                </Text>
+              </View>
+              <Text style={s.cellLabel}>mưa</Text>
+
+              {/* Risk chip */}
+              <View style={[s.riskChip, { backgroundColor: rc }]}>
+                <Text style={s.riskChipTxt}>{riskLabel}</Text>
+              </View>
             </View>
           );
         })}
       </View>
 
-      {/* ── Legend ── */}
-      <View style={s.legend}>
-        {(["low","medium","high","very_high"] as RiskLevel[]).map(r => (
-          <View key={r} style={s.legendItem}>
-            <RiskDot level={r} size={7} />
-            <Text style={s.legendTxt}>
-              {r==="low"?"Thấp":r==="medium"?"TB":r==="high"?"Cao":"Rất cao"}
-            </Text>
-          </View>
-        ))}
-        <Text style={s.updatedTxt}>· cập nhật {updatedStr}</Text>
-      </View>
+      {/* ── Footer: cập nhật ── */}
+      <Text style={s.updatedTxt}>🕐 Cập nhật lúc {updatedStr}</Text>
 
       <ProvincePicker
         visible={showPicker}
@@ -298,20 +314,25 @@ const s = StyleSheet.create({
     borderWidth:1, borderColor:"#ebebeb",
     gap:2,
   },
-  cellDow:   { fontSize:8, fontWeight:"600", color:Colors.textMuted, textAlign:"center", lineHeight:11 },
-  cellEmoji: { fontSize:15 },
-  cellTemp:  { fontSize:12, fontWeight:"800", color:Colors.text },
-  cellHum:   { fontSize:8,  color:Colors.textMuted },
-  cellRain:  { fontSize:8,  color:"#1976d2" },
+  cellDow:      { fontSize:9, fontWeight:"700", color:Colors.textMuted, textAlign:"center", lineHeight:12 },
+  cellEmoji:    { fontSize:18, marginVertical:2 },
 
-  // ── Legend ──
-  legend: {
-    flexDirection:"row", alignItems:"center", justifyContent:"center",
-    gap:10, paddingBottom:8, paddingHorizontal:12,
+  cellTempRow:  { flexDirection:"row", alignItems:"baseline", gap:3 },
+  cellTempMax:  { fontSize:13, fontWeight:"900", color:Colors.text },
+  cellTempMin:  { fontSize:10, fontWeight:"500", color:Colors.textMuted },
+
+  cellInfoRow:  { flexDirection:"row", alignItems:"center", gap:2, marginTop:4 },
+  cellInfoIcon: { fontSize:10 },
+  cellInfoVal:  { fontSize:10, fontWeight:"700", color:Colors.text },
+  cellLabel:    { fontSize:8, color:Colors.textMuted, marginTop:1 },
+
+  riskChip: {
+    marginTop:5, borderRadius:8,
+    paddingHorizontal:5, paddingVertical:2,
   },
-  legendItem:  { flexDirection:"row", alignItems:"center", gap:3 },
-  legendTxt:   { fontSize:9, color:Colors.textMuted },
-  updatedTxt:  { fontSize:9, color:Colors.textMuted },
+  riskChipTxt: { fontSize:8, fontWeight:"800", color:"#fff", textAlign:"center" },
+
+  updatedTxt:  { fontSize:9, color:Colors.textMuted, textAlign:"center", paddingBottom:7 },
 
   // ── States ──
   skRow:    { flexDirection:"row", alignItems:"center", gap:10, padding:16 },
