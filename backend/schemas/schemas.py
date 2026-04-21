@@ -77,6 +77,7 @@ class PredictionResult(BaseModel):
     predicted_class: str
     confidence:      float
     top3:            List[dict]
+    is_uncertain:    bool = False
     inference_ms:    float
     model_version:   str
 
@@ -97,6 +98,7 @@ class DiagnosisOut(BaseModel):
     created_at:       datetime
     disease:          Optional[DiseaseOut] = None
     is_ood:           Optional[bool]  = False
+    is_uncertain:     Optional[bool]  = False
     leaf_score:       Optional[float] = None
     model_config = {"from_attributes": True}
 

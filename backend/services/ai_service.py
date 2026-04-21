@@ -138,6 +138,25 @@ CLASS_NAMES = [
     "Leaf_Rhizoctonia",     # index 5
 ]
 
+# ── Các cặp dễ nhầm lẫn (từ phân tích confusion matrix) ──────
+# Algal → Phomopsis: 10 ảnh bị nhầm (lỗi lớn nhất)
+# Blight → Phomopsis: 3 ảnh; Healthy → Phomopsis: 4 ảnh
+# Lý do sinh học: Algal Leaf Spot và Phomopsis đều tạo đốm vàng/nâu
+CONFUSED_PAIRS: set[tuple[str, str]] = {
+    ("Leaf_Algal",   "Leaf_Phomopsis"),
+    ("Leaf_Phomopsis", "Leaf_Algal"),
+    ("Leaf_Blight",  "Leaf_Colletotrichum"),
+    ("Leaf_Colletotrichum", "Leaf_Blight"),
+    ("Leaf_Blight",  "Leaf_Phomopsis"),
+    ("Leaf_Healthy", "Leaf_Phomopsis"),
+}
+
+# Dưới ngưỡng này → flag uncertain kể cả không có confused pair
+CONFIDENCE_THRESHOLD_UNCERTAIN = 0.75
+
+# Top-2 phải cạnh tranh ít nhất mức này để kích hoạt cờ confused pair
+CONFUSED_TOP2_MIN_CONF = 0.20
+
 # ── Singleton model ────────────────────────────────────────────
 _model         = None   # ONNX session hoặc Ultralytics YOLO
 _model_type    = None   # "onnx" | "yolo" | None
@@ -280,10 +299,30 @@ def _predict_sync(image_path: str) -> dict:
                 for i, c in zip(p.top5[:3], p.top5conf.tolist()[:3])
             ]
 
+        # ── Kiểm tra uncertainty: confident thấp hoặc cặp dễ nhầm ──
+        top2_class = top3[1]["class"] if len(top3) > 1 else None
+        top2_conf  = top3[1]["confidence"] if len(top3) > 1 else 0.0
+
+        low_confidence  = top1_conf < CONFIDENCE_THRESHOLD_UNCERTAIN
+        confused_pair   = (
+            (predicted, top2_class) in CONFUSED_PAIRS
+            and top2_conf >= CONFUSED_TOP2_MIN_CONF
+        )
+        is_uncertain = low_confidence or confused_pair
+
+        if is_uncertain:
+            reason = []
+            if low_confidence:
+                reason.append(f"conf={top1_conf:.2f}<{CONFIDENCE_THRESHOLD_UNCERTAIN}")
+            if confused_pair:
+                reason.append(f"confused_pair=({predicted},{top2_class}) top2={top2_conf:.2f}")
+            print(f"[AI] UNCERTAIN: {', '.join(reason)}")
+
         return {
             "predicted_class": predicted,
             "confidence":      round(top1_conf, 4),
             "top3":            top3,
+            "is_uncertain":    is_uncertain,
             "inference_ms":    round(elapsed_ms, 2),
             "model_version":   _model_version,
             "is_ood":          False,
@@ -308,6 +347,7 @@ def _mock_prediction() -> dict:
         "predicted_class": cls,
         "confidence":      conf,
         "top3":            top3,
+        "is_uncertain":    conf < CONFIDENCE_THRESHOLD_UNCERTAIN,
         "inference_ms":    round(random.uniform(4.5, 8.0), 2),
         "model_version":   "Mock Mode (no model)",
     }

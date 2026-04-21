@@ -125,9 +125,10 @@ async def create_diagnosis(
         .where(Diagnosis.id == diagnosis.id)
     )
     diag_obj = result.scalar_one()
-    # Attach OOD info (not stored as column, injected from prediction)
-    diag_obj.is_ood     = prediction.get("is_ood", False)
-    diag_obj.leaf_score = prediction.get("leaf_score")
+    # Attach transient fields (not stored as columns, injected from prediction)
+    diag_obj.is_ood      = prediction.get("is_ood", False)
+    diag_obj.leaf_score  = prediction.get("leaf_score")
+    diag_obj.is_uncertain = prediction.get("is_uncertain", False)
     return diag_obj
 
 
