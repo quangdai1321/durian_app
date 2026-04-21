@@ -4,16 +4,18 @@
  * Grid: horizontal scroll, ô tối thiểu 80px, nhãn đầy đủ
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Modal, FlatList, ScrollView,
   useWindowDimensions,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useWeatherContext } from "../contexts/WeatherContext";
 import {
   RISK_COLOR, RISK_BG, RISK_LABEL,
   weatherEmoji, PROVINCES, RiskLevel, ProvinceWeather,
+  buildSmartRecommendations,
 } from "../hooks/useWeather";
 import { Colors } from "../constants/Colors";
 
@@ -91,12 +93,42 @@ const pm = StyleSheet.create({
 export default function WeatherCard() {
   const {
     loading, error, currentProvince, currentWeather,
-    neighborWeathers, lastUpdated, recommendation,
+    neighborWeathers, lastUpdated,
     refresh, changeProvince,
   } = useWeatherContext();
 
   const [showPicker, setShowPicker] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
+
+  // ── Đọc chẩn đoán gần nhất từ AsyncStorage ──────────────
+  const [recentDisease,   setRecentDisease]   = useState<string | null>(null);
+  const [diagnosedAt,     setDiagnosedAt]     = useState<number | null>(null);
+  const [recentLabelVI,   setRecentLabelVI]   = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem("last_diagnosis").then(raw => {
+      if (!raw) return;
+      try {
+        const d = JSON.parse(raw);
+        const cls = d?.disease_class ?? d?.predicted_class ?? null;
+        const ts  = d?.created_at
+          ? new Date(d.created_at).getTime()
+          : (d?.timestamp ?? null);
+        setRecentDisease(cls);
+        setDiagnosedAt(ts);
+        // Label tiếng Việt
+        const LABEL_VI: Record<string, string> = {
+          Leaf_Algal:          "Đốm tảo",
+          Leaf_Blight:         "Cháy lá",
+          Leaf_Colletotrichum: "Thán thư",
+          Leaf_Healthy:        "Lá khỏe",
+          Leaf_Phomopsis:      "Khô đầu lá",
+          Leaf_Rhizoctonia:    "Rhizoctonia",
+        };
+        setRecentLabelVI(cls ? (LABEL_VI[cls] ?? cls) : null);
+      } catch {}
+    });
+  }, []);
 
   // Nếu màn hình đủ rộng → dàn 7 ô đều (flex), ngược lại scroll ngang
   const CARD_PADDING  = 32 + 16; // marginHorizontal*2 + grid padding*2
@@ -109,8 +141,14 @@ export default function WeatherCard() {
     ? new Date(lastUpdated).toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" })
     : "--";
 
+  // ── Smart recommendations (re-computed khi có dữ liệu bệnh) ──
+  const smartRecs = currentWeather
+    ? buildSmartRecommendations(currentWeather.forecasts, recentDisease, diagnosedAt)
+    : { tips: [], bestSprayDay: null };
+  const recommendation = smartRecs.tips;
+
   // Render danh sách ô — dùng chung cho cả flex và scroll
-  const renderCells = (forecasts: typeof currentWeather.forecasts, flex: boolean) =>
+  const renderCells = (forecasts: NonNullable<typeof currentWeather>["forecasts"], flex: boolean) =>
     forecasts.map((f, i) => {
       const rc = RISK_COLOR[f.riskLevel];
       const rb = RISK_BG[f.riskLevel];
@@ -205,8 +243,15 @@ export default function WeatherCard() {
       {/* ══ HEADER DÒNG 2: khuyến nghị (full width) ══ */}
       {recommendation.length > 0 && (
         <View style={[s.hdr2, { backgroundColor: riskB }]}>
-          <Text style={s.hdr2Label}>💡 Khuyến nghị:</Text>
-          {recommendation.slice(0, 2).map((tip, i) => (
+          <View style={s.hdr2TitleRow}>
+            <Text style={s.hdr2Label}>💡 Khuyến nghị:</Text>
+            {recentLabelVI && diagnosedAt && (Date.now() - diagnosedAt < 7 * 24 * 60 * 60 * 1000) && (
+              <View style={s.hdr2Badge}>
+                <Text style={s.hdr2BadgeTxt}>📌 Dựa trên: {recentLabelVI}</Text>
+              </View>
+            )}
+          </View>
+          {recommendation.slice(0, 3).map((tip, i) => (
             <Text key={i} style={s.hdr2Tip}>{tip}</Text>
           ))}
         </View>
@@ -294,11 +339,14 @@ const s = StyleSheet.create({
 
   // ── Header dòng 2 — khuyến nghị ──
   hdr2: {
-    paddingHorizontal:12, paddingBottom:8,
+    paddingHorizontal:12, paddingVertical:8,
     borderTopWidth:1, borderTopColor:"rgba(0,0,0,.07)",
   },
-  hdr2Label: { fontSize:11, fontWeight:"700", color:Colors.primary, marginBottom:4 },
-  hdr2Tip:   { fontSize:11, color:Colors.text, lineHeight:17, marginBottom:2 },
+  hdr2TitleRow: { flexDirection:"row", alignItems:"center", flexWrap:"wrap", gap:6, marginBottom:5 },
+  hdr2Label:    { fontSize:11, fontWeight:"700", color:Colors.primary },
+  hdr2Badge:    { backgroundColor:"rgba(0,0,0,.10)", borderRadius:20, paddingHorizontal:8, paddingVertical:2 },
+  hdr2BadgeTxt: { fontSize:9, fontWeight:"700", color:Colors.text },
+  hdr2Tip:      { fontSize:11, color:Colors.text, lineHeight:17, marginBottom:3 },
 
   // ── Header dòng 3 — lân cận ──
   hdr3: {

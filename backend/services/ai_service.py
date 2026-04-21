@@ -1,42 +1,24 @@
 """
 ═══════════════════════════════════════════════════════════════
-AI Inference Service — YOLOv26n-CLS / Ultralytics
+AI Inference Service — YOLOv26n-CLS
+  • Ưu tiên ONNX Dynamic INT8 (nhanh hơn, nhỏ hơn)
+  • Fallback: .pt (Ultralytics) → Mock Mode
 ═══════════════════════════════════════════════════════════════
 
-CÁCH CONNECT MODEL — 3 bước:
-─────────────────────────────────────────────────────────────
+CÁCH CONNECT MODEL:
+  1. Copy file ONNX vào backend/models/model_fold5_dynamic.onnx
+  2. Hoặc copy .pt vào backend/models/best.pt
+  3. Cập nhật .env: MODEL_PATH=./models/best.pt
+     (service tự tìm file .onnx cùng thư mục)
 
-BƯỚC 1: Sau khi train xong trên Colab/Kaggle, export model:
-    ┌──────────────────────────────────────────────────────┐
-    │  from ultralytics import YOLO                        │
-    │  model = YOLO("runs/classify/train/weights/best.pt") │
-    │  # Kiểm tra class names đúng thứ tự:                │
-    │  print(model.names)                                  │
-    │  # Phải ra: {0:'Leaf_Algal', 1:'Leaf_Blight', ...}  │
-    └──────────────────────────────────────────────────────┘
-
-BƯỚC 2: Copy file .pt vào thư mục backend:
-    durian_app/
-    └── backend/
-        └── models/
-            └── yolov26n_durian.pt   ← đặt ở đây
-
-BƯỚC 3: Cập nhật .env:
-    MODEL_PATH=./models/yolov26n_durian.pt
-
-Sau đó uvicorn sẽ load model ngay khi khởi động.
-Nếu không tìm thấy file .pt → tự động chạy MOCK MODE.
-═══════════════════════════════════════════════════════════════
-
-LƯU Ý thứ tự class names — phải khớp với lúc training:
+Thứ tự class names (phải khớp với lúc training):
   Index 0 → Leaf_Algal
   Index 1 → Leaf_Blight
   Index 2 → Leaf_Colletotrichum
   Index 3 → Leaf_Healthy
   Index 4 → Leaf_Phomopsis
   Index 5 → Leaf_Rhizoctonia
-
-Nếu thứ tự khác, sửa CLASS_NAMES bên dưới cho đúng.
+═══════════════════════════════════════════════════════════════
 """
 
 import time
@@ -156,59 +138,74 @@ CLASS_NAMES = [
     "Leaf_Rhizoctonia",     # index 5
 ]
 
-# ── Singleton model (load 1 lần khi server start) ─────────────
-_model         = None
+# ── Singleton model ────────────────────────────────────────────
+_model         = None   # ONNX session hoặc Ultralytics YOLO
+_model_type    = None   # "onnx" | "yolo" | None
 _model_version = "not loaded"
-_model_loaded  = False   # cờ để không load lại nhiều lần
+_model_loaded  = False
+
+
+def _find_onnx_path(model_path: Path) -> Path | None:
+    """Tìm file .onnx cùng thư mục với .pt, hoặc file onnx được chỉ định."""
+    # Nếu chính model_path là .onnx
+    if model_path.suffix == ".onnx" and model_path.exists():
+        return model_path
+    # Tìm file .onnx trong cùng thư mục
+    model_dir = model_path.parent
+    for candidate in sorted(model_dir.glob("*.onnx")):
+        return candidate  # lấy file đầu tiên tìm thấy
+    return None
 
 
 def load_model_on_startup():
-    """
-    Gọi hàm này 1 lần trong lifespan của FastAPI (main.py).
-    Load model vào RAM ngay khi server khởi động — không phải lazy load.
-    """
-    global _model, _model_version, _model_loaded
+    """Load model vào RAM khi server khởi động (gọi 1 lần trong main.py)."""
+    global _model, _model_type, _model_version, _model_loaded
 
     if _model_loaded:
-        return  # đã load rồi, bỏ qua
+        return
 
     model_path = Path(settings.MODEL_PATH)
 
-    # ── Trường hợp 1: Có file .pt của mình ──────────────────
-    if model_path.exists():
+    # ── Ưu tiên 1: ONNX Dynamic INT8 (nhanh hơn, nhỏ hơn) ──────
+    onnx_path = _find_onnx_path(model_path)
+    if onnx_path:
+        try:
+            import onnxruntime as ort
+            print(f"[AI] Loading ONNX model: {onnx_path.name} ({onnx_path.stat().st_size/1024/1024:.1f} MB)")
+            sess_opts = ort.SessionOptions()
+            sess_opts.intra_op_num_threads = 2   # Railway: không dùng quá nhiều thread
+            sess_opts.inter_op_num_threads = 1
+            sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            _model         = ort.InferenceSession(str(onnx_path),
+                                sess_options=sess_opts,
+                                providers=["CPUExecutionProvider"])
+            _model_type    = "onnx"
+            _model_version = f"YOLOv26n-CLS-ONNX-INT8 ({onnx_path.name})"
+            _model_loaded  = True
+            print(f"[AI] OK: ONNX model loaded — {_model_version}")
+            return
+        except Exception as e:
+            print(f"[AI] ONNX load error: {e} — fallback to .pt")
+
+    # ── Ưu tiên 2: PyTorch .pt (Ultralytics) ────────────────────
+    if model_path.exists() and model_path.suffix == ".pt":
         try:
             from ultralytics import YOLO
-            print(f"[AI] Loading model từ: {model_path.resolve()}")
+            print(f"[AI] Loading PyTorch model: {model_path.name}")
             _model = YOLO(str(model_path))
-
-            # Tự động đọc class names từ model nếu có
-            if hasattr(_model, "names") and _model.names:
-                detected = list(_model.names.values())
-                # So sánh với CLASS_NAMES của mình
-                if detected != CLASS_NAMES:
-                    print(f"[AI] WARNING: Class names trong model: {detected}")
-                    print(f"[AI] WARNING: CLASS_NAMES trong code:  {CLASS_NAMES}")
-                    print(f"[AI] WARNING: Neu khac -> sua CLASS_NAMES trong ai_service.py")
-                else:
-                    print(f"[AI] OK: Class names khop: {CLASS_NAMES}")
-
-            _model_version = f"YOLOv26n-CLS-5FoldCV ({model_path.name})"
+            if hasattr(_model, "names") and list(_model.names.values()) != CLASS_NAMES:
+                print(f"[AI] WARNING: Class names khac — kiem tra lai CLASS_NAMES")
+            _model_type    = "yolo"
+            _model_version = f"YOLOv26n-CLS-PT ({model_path.name})"
             _model_loaded  = True
-            print(f"[AI] OK: Model loaded thanh cong!")
+            print(f"[AI] OK: PyTorch model loaded — {_model_version}")
             return
-
         except Exception as e:
-            print(f"[AI] ERROR: Load model that bai: {e}")
-            print(f"[AI] WARNING: Chay MOCK MODE do loi load model")
-            _model         = None
-            _model_version = "Mock Mode"
-            _model_loaded  = True
-            return
+            print(f"[AI] PyTorch load error: {e}")
 
-    # ── Trường hợp 2: Không có file .pt → MOCK MODE ─────────
-    print(f"[AI] WARNING: Khong tim thay file model tai: {model_path.resolve()}")
-    print(f"[AI] WARNING: Chay MOCK MODE - ket qua ngau nhien (chi dung de test UI)")
-    _model         = None
+    # ── Fallback: Mock Mode ──────────────────────────────────────
+    print(f"[AI] WARNING: Khong tim thay model → MOCK MODE")
+    _model, _model_type    = None, None
     _model_version = "Mock Mode"
     _model_loaded  = True
 
@@ -218,6 +215,7 @@ def get_model_status() -> dict:
     return {
         "loaded":        _model is not None,
         "version":       _model_version,
+        "type":          _model_type or "none",
         "model_path":    settings.MODEL_PATH,
         "file_exists":   Path(settings.MODEL_PATH).exists(),
         "class_names":   CLASS_NAMES,
@@ -234,33 +232,53 @@ async def predict_image(image_path: str) -> dict:
     return await loop.run_in_executor(None, _predict_sync, image_path)
 
 
+def _softmax(x: np.ndarray) -> np.ndarray:
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+
 def _predict_sync(image_path: str) -> dict:
-    """Chạy YOLO inference đồng bộ trên 1 ảnh (chỉ gọi sau khi đã pass leaf check)."""
+    """Chạy inference đồng bộ — hỗ trợ cả ONNX và YOLO .pt."""
 
     if _model is None:
         return _mock_prediction()
 
     t0 = time.perf_counter()
     try:
-        img        = Image.open(image_path).convert("RGB")
-        results    = _model.predict(img, imgsz=224, verbose=False)
-        elapsed_ms = (time.perf_counter() - t0) * 1000
+        # ── ONNX Runtime inference ───────────────────────────
+        if _model_type == "onnx":
+            img = Image.open(image_path).convert("RGB").resize((224, 224))
+            arr = np.array(img, dtype=np.float32) / 255.0
+            arr = arr.transpose(2, 0, 1)[np.newaxis]   # NCHW
+            inp_name = _model.get_inputs()[0].name
+            logits   = _model.run(None, {inp_name: arr})[0][0]
+            probs    = _softmax(logits)
+            elapsed_ms = (time.perf_counter() - t0) * 1000
 
-        probs = results[0].probs
+            top1_idx  = int(np.argmax(probs))
+            top1_conf = float(probs[top1_idx])
+            predicted = CLASS_NAMES[top1_idx] if top1_idx < len(CLASS_NAMES) else f"class_{top1_idx}"
+            top3_idx  = np.argsort(probs)[::-1][:3]
+            top3 = [
+                {"class": CLASS_NAMES[i] if i < len(CLASS_NAMES) else f"class_{i}",
+                 "confidence": round(float(probs[i]), 4)}
+                for i in top3_idx
+            ]
 
-        top1_idx  = int(probs.top1)
-        top1_conf = float(probs.top1conf)
-        predicted = CLASS_NAMES[top1_idx] if top1_idx < len(CLASS_NAMES) else f"class_{top1_idx}"
-
-        top5_idx   = probs.top5
-        top5_confs = probs.top5conf.tolist()
-        top3 = [
-            {
-                "class":      CLASS_NAMES[i] if i < len(CLASS_NAMES) else f"class_{i}",
-                "confidence": round(float(c), 4),
-            }
-            for i, c in zip(top5_idx[:3], top5_confs[:3])
-        ]
+        # ── Ultralytics YOLO .pt inference ──────────────────
+        else:
+            img      = Image.open(image_path).convert("RGB")
+            results  = _model.predict(img, imgsz=224, verbose=False)
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            p        = results[0].probs
+            top1_idx  = int(p.top1)
+            top1_conf = float(p.top1conf)
+            predicted = CLASS_NAMES[top1_idx] if top1_idx < len(CLASS_NAMES) else f"class_{top1_idx}"
+            top3 = [
+                {"class": CLASS_NAMES[i] if i < len(CLASS_NAMES) else f"class_{i}",
+                 "confidence": round(float(c), 4)}
+                for i, c in zip(p.top5[:3], p.top5conf.tolist()[:3])
+            ]
 
         return {
             "predicted_class": predicted,

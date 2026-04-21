@@ -175,42 +175,196 @@ export const RISK_BG: Record<RiskLevel, string> = {
 // ═══════════════════════════════════════════════════════════════
 //  RECOMMENDATION ENGINE
 // ═══════════════════════════════════════════════════════════════
-function buildRecommendations(forecasts: DayForecast[]): { tips: string[]; bestSprayDay: string | null } {
+
+/** Mùa vụ dựa vào tháng hiện tại (miền Nam VN) */
+function detectSeason(): "dry" | "rainy" | "transition" {
+  const m = new Date().getMonth() + 1; // 1-12
+  if (m >= 12 || m <= 3) return "dry";
+  if (m >= 5 && m <= 10) return "rainy";
+  return "transition"; // 4, 11
+}
+
+/**
+ * Tìm ngày tốt nhất phun thuốc:
+ * Ưu tiên: không mưa, ẩm < 78%, không quá nóng (< 36°)
+ */
+function findBestSprayDay(forecasts: DayForecast[]): DayForecast | undefined {
+  return forecasts.find(f => f.rain < 2 && f.humidity < 78 && f.tempMax < 36 && f.riskScore < 40);
+}
+
+/** Đếm số ngày sắp tới có thời tiết thuận lợi cho bệnh cụ thể */
+function countDangerousDays(
+  forecasts: DayForecast[],
+  minRain: number,
+  minHumidity: number,
+): number {
+  return forecasts.filter(f => f.rain >= minRain || f.humidity >= minHumidity).length;
+}
+
+/**
+ * buildSmartRecommendations — Rule engine có ngữ cảnh
+ * @param forecasts      7 ngày dự báo
+ * @param recentDisease  lớp bệnh từ lần chẩn đoán gần nhất (có thể null)
+ * @param diagnosedAt    timestamp (ms) chẩn đoán gần nhất để tính "vừa mới" hay "cũ"
+ */
+export function buildSmartRecommendations(
+  forecasts: DayForecast[],
+  recentDisease?: string | null,
+  diagnosedAt?: number | null,
+): { tips: string[]; bestSprayDay: string | null } {
   const tips: string[] = [];
-  const highRiskDays = forecasts.filter(f => f.riskScore >= 50).length;
-  const rainDays     = forecasts.filter(f => f.rain > 5).length;
-  const avgHum       = forecasts.reduce((s, f) => s + f.humidity, 0) / forecasts.length;
+  const season        = detectSeason();
+  const highRiskDays  = forecasts.filter(f => f.riskScore >= 50).length;
+  const rainDays      = forecasts.filter(f => f.rain > 5).length;
+  const avgHum        = Math.round(forecasts.reduce((s, f) => s + f.humidity, 0) / forecasts.length);
+  const maxRain       = Math.max(...forecasts.map(f => f.rain));
+  const bestDay       = findBestSprayDay(forecasts);
 
-  // Tìm ngày tốt nhất phun thuốc (nắng, ẩm thấp, không mưa)
-  const bestDay = forecasts.find(f => f.rain < 2 && f.humidity < 78 && f.riskScore < 30);
+  // ── Kiểm tra chẩn đoán có "mới" không (trong 7 ngày qua) ──
+  const isRecent = diagnosedAt != null && Date.now() - diagnosedAt < 7 * 24 * 60 * 60 * 1000;
 
-  if (highRiskDays >= 4) {
-    tips.push("⚠️ Tuần nguy hiểm — chuẩn bị Metalaxyl / Fosetyl-Al ngay hôm nay");
-    tips.push("🔍 Kiểm tra vườn mỗi ngày, phát hiện sớm triệu chứng cháy lá, thán thư");
-  } else if (highRiskDays >= 2) {
-    tips.push("⚡ Có ngày nguy cơ cao — theo dõi sát, sẵn sàng phun phòng ngừa");
+  // ── Mùa vụ context ──
+  const seasonNote =
+    season === "dry"        ? "Mùa khô" :
+    season === "rainy"      ? "Mùa mưa" :
+    "Giai đoạn chuyển mùa";
+
+  // ═══════════════════════════════════════════════════════════
+  //  PHẦN 1 — Lời khuyên cá nhân hoá theo bệnh vừa chẩn đoán
+  // ═══════════════════════════════════════════════════════════
+  if (recentDisease && isRecent) {
+    const dangerDays = countDangerousDays(forecasts.slice(0, 4), 3, 80);
+
+    switch (recentDisease) {
+      case "Leaf_Blight": {
+        // Phytophthora — phát tán mạnh khi mưa + ẩm
+        if (dangerDays >= 3) {
+          tips.push(`🚨 Vườn vừa phát hiện Cháy lá — ${dangerDays} ngày tới mưa ẩm thuận lợi cho bệnh lan nhanh. Phun Metalaxyl + Fosetyl-Al ngay hôm nay!`);
+          tips.push("🔍 Kiểm tra lá buổi sáng mỗi ngày, cắt bỏ ngay cành lá bị nặng, tiêu hủy ngoài vườn.");
+        } else if (dangerDays >= 1) {
+          tips.push("⚠️ Vườn có Cháy lá — sắp có 1-2 ngày mưa. Phun phòng Metalaxyl trước khi mưa đến.");
+          tips.push("💡 Pha thêm chất bám dính khi phun để thuốc không bị rửa trôi.");
+        } else {
+          tips.push("✅ Vườn có Cháy lá nhưng tuần này thời tiết khô — tranh thủ phun Metalaxyl để kiểm soát.");
+        }
+        tips.push("🌿 Tỉa tán thông thoáng, tránh tưới ướt lá — Phytophthora lây qua nước bắn.");
+        break;
+      }
+
+      case "Leaf_Colletotrichum": {
+        // Thán thư — mưa nhẹ + ẩm cao
+        const humidDays = forecasts.slice(0, 4).filter(f => f.humidity > 80).length;
+        if (humidDays >= 3) {
+          tips.push(`⚠️ Vườn có Thán thư — ${humidDays} ngày tới ẩm > 80%, bệnh dễ lây sang lá non. Phun Carbendazim hoặc Thiophanate-methyl ngay.`);
+        } else {
+          tips.push("🍂 Vườn có Thán thư — thời tiết tạm ổn, duy trì phun phòng Carbendazim 1 lần/tuần.");
+        }
+        tips.push("✂️ Cắt bỏ lá bệnh đã chuyển nâu, thu gom và tiêu hủy để cắt nguồn bào tử.");
+        break;
+      }
+
+      case "Leaf_Algal": {
+        // Đốm tảo — ẩm cao + ít gió
+        const wetDays = countDangerousDays(forecasts.slice(0, 5), 1, 85);
+        if (wetDays >= 3) {
+          tips.push(`🦠 Vườn có Đốm tảo — ${wetDays} ngày tới ẩm ướt kéo dài. Phun Copper Oxychloride hoặc Bordeaux mixture để ngăn tảo lan.`);
+        } else {
+          tips.push("🦠 Vườn có Đốm tảo — phun Copper Oxychloride phòng ngừa, đặc biệt mặt dưới lá.");
+        }
+        tips.push("☀️ Tỉa cành để ánh sáng và gió vào tán — tảo không phát triển được ở nơi khô thoáng.");
+        break;
+      }
+
+      case "Leaf_Rhizoctonia": {
+        // Rhizoctonia — ẩm cao + đất ướt
+        if (rainDays >= 3) {
+          tips.push("🌱 Vườn có Rhizoctonia — mưa nhiều tuần này sẽ làm ẩm đất, bệnh dễ lan rễ non. Kiểm tra hệ thống thoát nước ngay.");
+          tips.push("💊 Phun Validamycin hoặc Hexaconazole vào gốc cây, tập trung vùng gần mặt đất.");
+        } else {
+          tips.push("🌱 Vườn có Rhizoctonia — tuần này ít mưa, thuận lợi xử lý: phun Validamycin gốc + rải vôi xung quanh.");
+        }
+        tips.push("🚿 Không tưới quá ẩm, đảm bảo đất không đọng nước sau mưa.");
+        break;
+      }
+
+      case "Leaf_Phomopsis": {
+        // Khô đầu lá — thường do khô hạn + nấm cơ hội
+        if (season === "dry" || maxRain < 5) {
+          tips.push("🥀 Vườn có Khô đầu lá (Phomopsis) — mùa khô làm cây yếu, dễ nhiễm nấm. Tưới bổ sung đủ ẩm cho đất.");
+          tips.push("💊 Phun Iprodione hoặc Chlorothalonil kết hợp bón phân Kali để tăng sức đề kháng lá.");
+        } else {
+          tips.push("🥀 Vườn có Khô đầu lá — phun Iprodione phòng ngừa. Kiểm tra thêm dinh dưỡng (thiếu Canxi, Kali dễ gây bệnh).");
+        }
+        break;
+      }
+
+      case "Leaf_Healthy":
+      default: {
+        // Lá khỏe nhưng thời tiết xấu → khuyến nghị phòng ngừa
+        if (highRiskDays >= 3) {
+          tips.push(`💪 Lá hiện khỏe mạnh — nhưng ${highRiskDays} ngày tới nguy cơ cao. ${seasonNote}, nên phun phòng trước khi mưa.`);
+          tips.push("🛡️ Phun phòng Metalaxyl + Carbendazim kết hợp để bảo vệ toàn diện.");
+        }
+        break;
+      }
+    }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  PHẦN 2 — Lời khuyên theo thời tiết (luôn hiển thị)
+  // ═══════════════════════════════════════════════════════════
+
+  // Cảnh báo tuần nguy hiểm (nếu chưa có cảnh báo bệnh cụ thể)
+  if (tips.length === 0) {
+    if (highRiskDays >= 4) {
+      tips.push(`⚠️ ${seasonNote} — tuần nguy hiểm (${highRiskDays}/7 ngày nguy cơ cao). Chuẩn bị Metalaxyl / Fosetyl-Al ngay hôm nay.`);
+      tips.push("🔍 Kiểm tra vườn mỗi sáng — phát hiện sớm cháy lá, thán thư để xử lý kịp thời.");
+    } else if (highRiskDays >= 2) {
+      tips.push(`⚡ ${seasonNote} — có ${highRiskDays} ngày nguy cơ cao. Theo dõi sát, sẵn sàng phun phòng khi thấy triệu chứng đầu tiên.`);
+    }
+  }
+
+  // Mưa nhiều → thoát nước
   if (rainDays >= 4) {
-    tips.push("🌧️ Mưa nhiều — kiểm tra thoát nước, tránh đọng nước gốc cây");
-    tips.push("🚫 Không phun thuốc trong ngày mưa (bị rửa trôi)");
+    tips.push("🌧️ Mưa nhiều liên tục — kiểm tra mương thoát nước, tránh đọng nước gốc cây gây thối rễ.");
+    if (!tips.some(t => t.includes("Không phun"))) {
+      tips.push("🚫 Không phun thuốc trong ngày mưa — thuốc sẽ bị rửa trôi và gây lãng phí.");
+    }
   }
 
-  if (avgHum > 85) {
-    tips.push("💧 Độ ẩm cao kéo dài — tỉa cành tạo thông thoáng tán cây");
+  // Độ ẩm cao kéo dài → tỉa cành
+  if (avgHum > 85 && !tips.some(t => t.includes("tỉa cành") || t.includes("tỉa tán"))) {
+    tips.push(`💧 Độ ẩm trung bình tuần này cao (${avgHum}%) — tỉa cành bên trong tán để tạo thông thoáng, giảm ẩm vi khí hậu.`);
   }
 
+  // Ngày tốt nhất phun
   if (bestDay) {
     const [, m, d] = bestDay.date.split("-");
-    tips.push(`✅ Thời điểm phun thuốc tốt nhất: ngày ${d}/${m} (trời nắng, ẩm thấp)`);
+    const label = bestDay.date === forecasts[0].date ? "Hôm nay"
+                : bestDay.date === forecasts[1]?.date ? "Ngày mai"
+                : `Ngày ${d}/${m}`;
+    if (!tips.some(t => t.includes("phun thuốc tốt nhất"))) {
+      tips.push(`✅ Thời điểm phun thuốc tốt nhất: ${label} (nắng ráo, ẩm thấp, thuốc bám tốt).`);
+    }
   }
 
+  // Mùa khô → nhắc tưới nước
+  if (season === "dry" && maxRain < 3 && !tips.some(t => t.includes("tưới"))) {
+    tips.push("☀️ Mùa khô — đảm bảo tưới đủ nước 2 ngày/lần, giữ ẩm gốc để cây không bị stress.");
+  }
+
+  // Nếu vẫn không có tip nào
   if (tips.length === 0) {
-    tips.push("🟢 Tuần này nguy cơ thấp — tiếp tục chăm sóc định kỳ");
-    tips.push("📋 Kiểm tra vườn 2-3 lần/tuần để phát hiện sớm");
+    tips.push("🟢 Tuần này nguy cơ thấp — tiếp tục chăm sóc định kỳ, kiểm tra vườn 2-3 lần/tuần.");
+    tips.push("📋 Ghi chép tình trạng lá hàng tuần để phát hiện sớm dấu hiệu bệnh.");
   }
 
   return { tips, bestSprayDay: bestDay?.date ?? null };
+}
+
+/** Backward-compat wrapper (dùng trong load() không có context bệnh) */
+function buildRecommendations(forecasts: DayForecast[]): { tips: string[]; bestSprayDay: string | null } {
+  return buildSmartRecommendations(forecasts, null, null);
 }
 
 // ═══════════════════════════════════════════════════════════════
