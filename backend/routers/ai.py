@@ -44,7 +44,9 @@ async def ai_chat(body: dict, current_user: User | None = Depends(get_optional_u
                 },
             )
         if resp.status_code != 200:
-            detail = resp.json().get("error", {}).get("message", f"OpenAI error {resp.status_code}")
+            err_body = resp.json()
+            detail   = err_body.get("error", {}).get("message", f"OpenAI error {resp.status_code}")
+            print(f"[AI Chat] OpenAI {resp.status_code}: {detail}")
             raise HTTPException(status_code=502, detail=detail)
         return resp.json()
 
