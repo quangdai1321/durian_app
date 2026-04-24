@@ -26,12 +26,17 @@ async function request<T>(
   });
 
   if (!res.ok) {
+    // Token hết hạn → xóa ngay để tránh lặp lại lỗi
+    if (res.status === 401) {
+      await AsyncStorage.multiRemove(["access_token", "user"]).catch(() => {});
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     // Preserve structured detail (e.g. { code, message, hint })
     const error: any = new Error(
       typeof err.detail === "string" ? err.detail : (err.detail?.message || "Request failed")
     );
-    error.detail = err.detail; // attach original detail object
+    error.status = res.status;   // đính kèm HTTP status để caller xử lý
+    error.detail = err.detail;   // attach original detail object
     throw error;
   }
   return res.json();

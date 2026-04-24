@@ -7,7 +7,7 @@ Lý do proxy qua backend:
 from fastapi import APIRouter, Depends, HTTPException
 import httpx
 
-from .deps import get_current_user
+from .deps import get_optional_user
 from ..models.models import User
 from ..config import settings
 
@@ -15,10 +15,11 @@ router = APIRouter(prefix="/ai", tags=["AI Chat"])
 
 
 @router.post("/chat")
-async def ai_chat(body: dict, current_user: User = Depends(get_current_user)):
+async def ai_chat(body: dict, current_user: User | None = Depends(get_optional_user)):
     """
     Proxy chat completion request đến OpenAI gpt-4o-mini.
     Frontend gửi: { messages: [...], max_tokens: int }
+    Không yêu cầu đăng nhập — guest cũng dùng được.
     """
     if not settings.OPENAI_API_KEY:
         raise HTTPException(status_code=503, detail="AI service chưa được cấu hình (OPENAI_API_KEY trống)")

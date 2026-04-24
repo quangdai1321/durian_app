@@ -7,6 +7,27 @@ import {
 import { Colors } from "../constants/Colors";
 import { chatApi } from "../services/api";
 
+/** Chuyển lỗi API thành chuỗi tiếng Việt thân thiện */
+function friendlyError(e: any): string {
+  const status = e?.status;
+  const msg    = (e?.message || "").toLowerCase();
+
+  if (status === 401 || msg.includes("invalid or expired") || msg.includes("not authenticated"))
+    return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.";
+  if (status === 403)
+    return "Bạn không có quyền sử dụng tính năng này.";
+  if (status === 503 || msg.includes("chưa được cấu hình"))
+    return "Dịch vụ AI đang bảo trì. Vui lòng thử lại sau.";
+  if (status === 429 || msg.includes("rate limit") || msg.includes("quota"))
+    return "Quá nhiều yêu cầu. Hãy đợi vài giây rồi thử lại.";
+  if (status >= 500)
+    return "Máy chủ đang gặp sự cố. Vui lòng thử lại sau ít phút.";
+  if (msg.includes("network") || msg.includes("fetch") || msg.includes("failed to fetch"))
+    return "Không có kết nối mạng. Kiểm tra WiFi / dữ liệu di động rồi thử lại.";
+
+  return "Không kết nối được AI. Vui lòng thử lại.";
+}
+
 const SYSTEM_PROMPT = `Bạn là chuyên gia nông nghiệp sầu riêng AI. Trả lời ngắn gọn, thực tế bằng tiếng Việt.
 Chuyên về: bệnh cây sầu riêng, kỹ thuật canh tác, phân bón, phòng trừ sâu bệnh, thu hoạch.
 Nếu không liên quan đến nông nghiệp sầu riêng, nhẹ nhàng hướng về chủ đề này.`;
@@ -124,7 +145,7 @@ export default function FloatingChat() {
       setMsgs(prev => [...prev, { role: "assistant", text: reply }]);
       if (!open) setUnread(u => u + 1);
     } catch (e: any) {
-      setMsgs(prev => [...prev, { role: "assistant", text: `⚠️ ${e?.message || "Không kết nối được."}` }]);
+      setMsgs(prev => [...prev, { role: "assistant", text: `⚠️ ${friendlyError(e)}` }]);
     } finally {
       setLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);

@@ -1,8 +1,9 @@
-from pydantic_settings import BaseSettings
+import os
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
 class Settings(BaseSettings):
-    # Tất cả giá trị nhạy cảm đọc từ file .env (KHÔNG hardcode ở đây)
+    # Đọc từ environment variables (Railway inject) hoặc .env khi dev local
     DATABASE_URL:                str
     SECRET_KEY:                  str
     OPENAI_API_KEY:              str = ""          # optional nếu chưa có
@@ -11,6 +12,14 @@ class Settings(BaseSettings):
     MODEL_PATH:                  str = "./models/best.pt"
     UPLOAD_DIR:                  str = "./uploads"
     MAX_FILE_SIZE_MB:            int = 10
+
+    # Production (Railway): chỉ đọc env vars, bỏ qua .env file
+    # Local dev: đọc thêm .env nếu file tồn tại
+    model_config = SettingsConfigDict(
+        env_file=".env" if os.path.exists(".env") else None,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -25,9 +34,5 @@ class Settings(BaseSettings):
             if v.startswith("postgresql://") and "+asyncpg" not in v:
                 return "postgresql+asyncpg://" + v[len("postgresql://"):]
         return v
-
-    class Config:
-        env_file = ".env"           # đọc từ backend/.env
-        env_file_encoding = "utf-8"
 
 settings = Settings()
