@@ -19,8 +19,11 @@ def set_cache(key: str, data):
     _cache[key] = {"ts": time.time(), "data": data}
 
 RSS_FEEDS = [
-    ("https://news.google.com/rss/search?q=s%E1%BA%A7u+ri%C3%AAng&hl=vi&gl=VN&ceid=VN:vi", "Google News - Sầu riêng"),
-    ("https://news.google.com/rss/search?q=durian+Vietnam&hl=vi&gl=VN&ceid=VN:vi", "Google News - Durian"),
+    ("https://news.google.com/rss/search?q=s%E1%BA%A7u+ri%C3%AAng&hl=vi&gl=VN&ceid=VN:vi",             "Google News - Sầu riêng"),
+    ("https://news.google.com/rss/search?q=durian+Vietnam&hl=vi&gl=VN&ceid=VN:vi",                     "Google News - Durian"),
+    ("https://news.google.com/rss/search?q=b%E1%BB%87nh+s%E1%BA%A7u+ri%C3%AAng&hl=vi&gl=VN&ceid=VN:vi","Google News - Bệnh sầu riêng"),
+    ("https://news.google.com/rss/search?q=n%C3%B4ng+nghi%E1%BB%87p+Vi%E1%BB%87t+Nam&hl=vi&gl=VN&ceid=VN:vi","Google News - Nông nghiệp"),
+    ("https://news.google.com/rss/search?q=tr%C3%A1i+c%C3%A2y+xu%E1%BA%A5t+kh%E1%BA%A9u&hl=vi&gl=VN&ceid=VN:vi","Google News - Trái cây XK"),
 ]
 
 
@@ -316,39 +319,58 @@ async def get_prices():
 
 
 @router.get("")
-async def get_news():
-    cached = get_cache("news")
-    if cached:
-        return cached
+async def get_news(page: int = 1, page_size: int = 15):
+    """
+    Trả về tin tức theo trang.
+    page=1&page_size=15 → 15 bài đầu
+    page=2&page_size=15 → 15 bài tiếp theo
+    """
     import asyncio
-    all_items = []
-    async with httpx.AsyncClient(timeout=10, follow_redirects=True,
-                                  headers={"User-Agent": "Mozilla/5.0"}) as client:
-        for url, label in RSS_FEEDS:
-            try:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    all_items.extend(parse_rss(resp.text))
-            except Exception:
-                continue
 
-    # deduplicate by title
-    seen = set()
-    unique = []
-    for item in all_items:
-        if item["title"] not in seen:
-            seen.add(item["title"])
-            unique.append(item)
-    unique = unique[:30]
+    # Fetch toàn bộ items (cache chung cho mọi trang)
+    all_cache = get_cache("news_all")
+    if not all_cache:
+        all_items = []
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True,
+                                      headers={"User-Agent": "Mozilla/5.0"}) as client:
+            resps = await asyncio.gather(
+                *[client.get(url) for url, _ in RSS_FEEDS],
+                return_exceptions=True,
+            )
+        for resp in resps:
+            if isinstance(resp, Exception): continue
+            if resp.status_code == 200:
+                all_items.extend(parse_rss(resp.text))
 
-    # Resolve actual article URLs in parallel
-    async with httpx.AsyncClient(timeout=8, follow_redirects=True,
-                                  headers={"User-Agent": "Mozilla/5.0"}) as client:
-        resolved = await asyncio.gather(*[resolve_url(client, i["link"]) for i in unique])
+        # Deduplicate by title
+        seen = set()
+        unique = []
+        for item in all_items:
+            if item["title"] not in seen:
+                seen.add(item["title"])
+                unique.append(item)
+        unique = unique[:80]   # tối đa 80 bài từ tất cả feed
 
-    for i, item in enumerate(unique):
-        item["link"] = resolved[i]
+        # Resolve URLs in parallel
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True,
+                                      headers={"User-Agent": "Mozilla/5.0"}) as client:
+            resolved = await asyncio.gather(*[resolve_url(client, i["link"]) for i in unique])
+        for i, item in enumerate(unique):
+            item["link"] = resolved[i]
 
-    result = {"total": len(unique), "items": unique}
-    set_cache("news", result)
-    return result
+        all_cache = unique
+        set_cache("news_all", all_cache)
+
+    # Phân trang
+    total   = len(all_cache)
+    offset  = (page - 1) * page_size
+    items   = all_cache[offset : offset + page_size]
+    has_more = (offset + page_size) < total
+
+    return {
+        "total":    total,
+        "page":     page,
+        "page_size": page_size,
+        "has_more": has_more,
+        "items":    items,
+    }

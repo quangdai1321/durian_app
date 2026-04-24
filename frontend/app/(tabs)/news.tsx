@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Platform, RefreshControl, Modal,
-  TextInput, KeyboardAvoidingView,
+  TextInput, ScrollView,
 } from "react-native";
 import { Colors } from "../../constants/Colors";
 import { newsApi } from "../../services/api";
@@ -24,9 +24,14 @@ interface PriceItem {
   pubDate: string;
 }
 
+const PAGE_SIZE = 15;
+
 // Module-level cache
-const _cache: { items: NewsItem[]; prices: PriceItem[]; priceDate: string; ts: number } = {
-  items: [], prices: [], priceDate: "", ts: 0,
+const _cache: {
+  items: NewsItem[]; prices: PriceItem[]; priceDate: string;
+  ts: number; total: number; hasMore: boolean;
+} = {
+  items: [], prices: [], priceDate: "", ts: 0, total: 0, hasMore: true,
 };
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -273,8 +278,11 @@ export default function NewsScreen() {
   const hasCached = _cache.ts > 0;
   const [items,       setItems]      = useState<NewsItem[]>(_cache.items);
   const [loading,     setLoading]    = useState(!hasCached);
+  const [loadingMore, setLoadingMore]= useState(false);
   const [refreshing,  setRefreshing] = useState(false);
   const [error,       setError]      = useState("");
+  const [hasMore,     setHasMore]    = useState(_cache.hasMore);
+  const [currentPage, setCurrentPage]= useState(1);
   const [prices,      setPrices]     = useState<PriceItem[]>(_cache.prices);
   const [priceDate,   setPriceDate]  = useState(_cache.priceDate);
   const [showPrices,  setShowPrices] = useState(false);
@@ -284,28 +292,57 @@ export default function NewsScreen() {
   const [searchItems, setSearchItems]= useState<NewsItem[]>([]);
   const [searchError, setSearchError]= useState("");
 
+  // Tải trang đầu hoặc refresh
   const fetchNews = useCallback(async (isRefresh = false) => {
     const stale = Date.now() - _cache.ts > CACHE_TTL_MS;
-    if (!isRefresh && !stale) return;
+    if (!isRefresh && !stale && hasCached) return;
     if (isRefresh) setRefreshing(true);
-    else if (!hasCached) setLoading(true);
+    else setLoading(true);
     setError("");
     try {
       const [nd, pd] = await Promise.all([
-        newsApi.list(),
+        newsApi.list(1, PAGE_SIZE),
         newsApi.prices().catch(() => null),
       ]) as any[];
       if (!nd) throw new Error("Không thể tải tin tức");
-      _cache.items = nd.items || [];
-      _cache.prices = pd?.prices || [];
-      _cache.priceDate = pd?.updated || "";
-      _cache.ts = Date.now();
+      _cache.items    = nd.items || [];
+      _cache.total    = nd.total || 0;
+      _cache.hasMore  = nd.has_more ?? false;
+      _cache.prices   = pd?.prices || [];
+      _cache.priceDate= pd?.updated || "";
+      _cache.ts       = Date.now();
       setItems(_cache.items);
+      setHasMore(_cache.hasMore);
+      setCurrentPage(1);
       if (_cache.prices.length) { setPrices(_cache.prices); setPriceDate(_cache.priceDate); }
     } catch (e: any) {
       if (!hasCached) setError(e.message || "Lỗi kết nối");
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
+
+  // Tải thêm khi scroll đến cuối
+  const fetchMore = useCallback(async () => {
+    if (loadingMore || !hasMore || searching) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const nd: any  = await newsApi.list(nextPage, PAGE_SIZE);
+      const newItems = nd.items || [];
+      if (newItems.length > 0) {
+        const merged = [..._cache.items, ...newItems.filter(
+          (n: NewsItem) => !_cache.items.some(old => old.link === n.link)
+        )];
+        _cache.items   = merged;
+        _cache.hasMore = nd.has_more ?? false;
+        setItems(merged);
+        setHasMore(_cache.hasMore);
+        setCurrentPage(nextPage);
+      } else {
+        setHasMore(false);
+      }
+    } catch { /* im lặng — user vẫn thấy tin cũ */ }
+    finally { setLoadingMore(false); }
+  }, [loadingMore, hasMore, currentPage, searching]);
 
   useEffect(() => { fetchNews(); }, []);
 
@@ -325,13 +362,60 @@ export default function NewsScreen() {
   };
 
   const clearSearch = () => { setQuery(""); setSearchItems([]); setSearchError(""); };
-  const displayItems = searchItems.length ? searchItems : items;
-  const isSearchMode = query.trim().length > 0;
+
+  const isSearchMode  = query.trim().length > 0;
+  const displayItems  = isSearchMode ? searchItems : items;
+
+  // ── Render mỗi card ──────────────────────────────────────────
+  const renderItem = ({ item }: { item: NewsItem }) => (
+    <TouchableOpacity style={s.card} onPress={() => setActiveItem(item)} activeOpacity={0.75}>
+      <View style={s.cardTop}>
+        {item.source
+          ? <View style={s.badge}><Text style={s.badgeText}>{item.source}</Text></View>
+          : null}
+        <Text style={s.timeText}>{timeAgo(item.pubDate)}</Text>
+      </View>
+      <Text style={s.title} numberOfLines={3}>{item.title}</Text>
+      {item.summary
+        ? <Text style={s.summary} numberOfLines={2}>{item.summary}</Text>
+        : null}
+      <Text style={s.readMore}>📖 Đọc bài →</Text>
+    </TouchableOpacity>
+  );
+
+  // ── Footer: loading / hết tin / empty ───────────────────────
+  const renderFooter = () => {
+    if (loadingMore) return (
+      <View style={s.footerLoader}>
+        <ActivityIndicator size="small" color={Colors.primary} />
+        <Text style={s.footerText}>Đang tải thêm...</Text>
+      </View>
+    );
+    if (!hasMore && displayItems.length > 0 && !isSearchMode) return (
+      <View style={s.footerEnd}>
+        <Text style={s.footerEndText}>✅ Đã hiển thị tất cả {items.length} bài viết</Text>
+      </View>
+    );
+    return <View style={{ height: 40 }} />;
+  };
+
+  // ── Header của FlatList (search bar + count) ─────────────────
+  const renderListHeader = () => (
+    <>
+      {isSearchMode && searchItems.length > 0 && (
+        <Text style={s.countText}>🔍 {searchItems.length} kết quả cho "{query}"</Text>
+      )}
+      {!isSearchMode && items.length > 0 && (
+        <Text style={s.countText}>{_cache.total || items.length} bài viết · Kéo xuống để làm mới</Text>
+      )}
+      {searchError ? <Text style={s.searchErrorText}>{searchError}</Text> : null}
+    </>
+  );
 
   return (
     <AuthGuard>
     <View style={s.root}>
-      {/* Header */}
+      {/* Header cố định */}
       <View style={s.header}>
         <View style={s.headerRow}>
           <View>
@@ -394,43 +478,31 @@ export default function NewsScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView style={s.list} showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => fetchNews(true)}
-              tintColor={Colors.primary} colors={[Colors.primary]} />
+        <FlatList
+          data={displayItems}
+          keyExtractor={(item, i) => item.link || String(i)}
+          renderItem={renderItem}
+          ListHeaderComponent={renderListHeader}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={
+            !searching ? (
+              <View style={s.center}><Text style={s.emptyText}>Không có tin tức</Text></View>
+            ) : null
           }
-        >
-          {isSearchMode && searchItems.length > 0 && (
-            <Text style={s.countText}>🔍 {searchItems.length} kết quả cho "{query}"</Text>
-          )}
-          {!isSearchMode && (
-            <Text style={s.countText}>{items.length} bài viết · Kéo xuống để làm mới</Text>
-          )}
-          {searchError ? (
-            <Text style={s.searchErrorText}>{searchError}</Text>
-          ) : null}
-
-          {displayItems.map((item, i) => (
-            <TouchableOpacity key={i} style={s.card} onPress={() => setActiveItem(item)} activeOpacity={0.75}>
-              <View style={s.cardTop}>
-                {item.source
-                  ? <View style={s.badge}><Text style={s.badgeText}>{item.source}</Text></View>
-                  : null}
-                <Text style={s.timeText}>{timeAgo(item.pubDate)}</Text>
-              </View>
-              <Text style={s.title} numberOfLines={3}>{item.title}</Text>
-              {item.summary
-                ? <Text style={s.summary} numberOfLines={2}>{item.summary}</Text>
-                : null}
-              <Text style={s.readMore}>📖 Đọc bài →</Text>
-            </TouchableOpacity>
-          ))}
-
-          {!loading && displayItems.length === 0 && !searchError && (
-            <View style={s.center}><Text style={s.emptyText}>Không có tin tức</Text></View>
-          )}
-          <View style={{ height: 40 }} />
-        </ScrollView>
+          style={s.list}
+          contentContainerStyle={{ paddingBottom: 8 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchNews(true)}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
+          onEndReached={fetchMore}
+          onEndReachedThreshold={0.3}   // trigger khi còn 30% cuối danh sách
+        />
       )}
     </View>
     </AuthGuard>
@@ -558,4 +630,9 @@ const s = StyleSheet.create({
   summary:  { fontSize: 13, color: Colors.textMuted, lineHeight: 19, marginBottom: 8 },
   readMore: { fontSize: 12, color: Colors.primary, fontWeight: "600" },
   emptyText:{ color: Colors.textMuted, fontSize: 14 },
+
+  footerLoader: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 },
+  footerText:   { fontSize: 13, color: Colors.textMuted },
+  footerEnd:    { alignItems: "center", paddingVertical: 16 },
+  footerEndText:{ fontSize: 12, color: Colors.textMuted },
 });

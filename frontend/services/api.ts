@@ -136,10 +136,11 @@ export const yieldStatsApi = {
 
 // ── News ─────────────────────────────────────────────────────
 export const newsApi = {
-  list: () => request("GET", "/news"),
-  prices: () => request("GET", "/news/prices"),
+  list: (page = 1, pageSize = 15) =>
+    request("GET", `/news?page=${page}&page_size=${pageSize}`),
+  prices:  () => request("GET", "/news/prices"),
   article: (url: string) => request("GET", `/news/article?url=${encodeURIComponent(url)}`),
-  search: (q: string) => request("GET", `/news/search?q=${encodeURIComponent(q)}`),
+  search:  (q: string)   => request("GET", `/news/search?q=${encodeURIComponent(q)}`),
 };
 
 // ── AI Chat (proxy qua backend — OpenAI key không lộ ở frontend) ──
