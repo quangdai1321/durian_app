@@ -3,14 +3,14 @@ import aiofiles
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, text
 from sqlalchemy.orm import selectinload
 from typing import Optional
 
 from ..database import get_db
 from ..models.models import Diagnosis, DiseaseClass, User, Feedback
 from ..schemas.schemas import DiagnosisOut, DiagnosisList, FeedbackCreate, FeedbackOut
-from ..services.ai_service import predict_image, check_is_durian_leaf
+from ..services.ai_service import predict_image, check_is_durian_leaf, CLASS_NAMES
 from ..services.auth_service import get_user_by_id
 from ..config import settings
 from .deps import get_current_user, get_optional_user
@@ -164,6 +164,66 @@ async def get_diagnosis(
     if not diag:
         raise HTTPException(404, "Diagnosis not found")
     return diag
+
+
+@router.get("/stats", tags=["Diagnosis"])
+async def inference_stats(db: AsyncSession = Depends(get_db)):
+    """
+    Thống kê inference time thực tế trên server (Railway deployment).
+    Dùng cho báo cáo / paper: avg, min, max, p50, p95, p99 (ms).
+    Không yêu cầu đăng nhập.
+    """
+    rows = (await db.execute(
+        select(Diagnosis.inference_ms, Diagnosis.predicted_class, Diagnosis.model_version)
+        .where(
+            Diagnosis.inference_ms.isnot(None),
+            Diagnosis.inference_ms > 0,
+            Diagnosis.model_version.notlike("%Mock%"),
+        )
+    )).all()
+
+    if not rows:
+        return {"message": "Chưa có dữ liệu inference thực tế", "total_samples": 0}
+
+    times = sorted([r.inference_ms for r in rows])
+    n     = len(times)
+
+    def pct(p: float) -> float:
+        idx = min(int(p / 100 * n), n - 1)
+        return round(times[idx], 2)
+
+    # Phân phối theo class
+    from collections import defaultdict
+    class_times: dict = defaultdict(list)
+    for r in rows:
+        if r.predicted_class:
+            class_times[r.predicted_class].append(r.inference_ms)
+
+    per_class = {
+        cls: {
+            "count": len(ts),
+            "avg_ms": round(sum(ts) / len(ts), 2),
+        }
+        for cls, ts in sorted(class_times.items())
+    }
+
+    model_versions = list({r.model_version for r in rows if r.model_version})
+
+    return {
+        "deployment":     "Railway Cloud (CPU)",
+        "model_versions": model_versions,
+        "total_samples":  n,
+        "inference_ms": {
+            "avg": round(sum(times) / n, 2),
+            "min": round(times[0], 2),
+            "max": round(times[-1], 2),
+            "p50": pct(50),
+            "p95": pct(95),
+            "p99": pct(99),
+        },
+        "per_class": per_class,
+        "note": "Measured server-side using time.perf_counter() — excludes network latency",
+    }
 
 
 @router.post("/{diagnosis_id}/feedback", response_model=FeedbackOut, status_code=201)
