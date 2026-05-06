@@ -149,24 +149,8 @@ async def list_diagnoses(
     return DiagnosisList(total=total, items=rows)
 
 
-@router.get("/{diagnosis_id}", response_model=DiagnosisOut)
-async def get_diagnosis(
-    diagnosis_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(Diagnosis)
-        .options(selectinload(Diagnosis.disease).selectinload(DiseaseClass.steps))
-        .where(Diagnosis.id == diagnosis_id, Diagnosis.user_id == current_user.id)
-    )
-    diag = result.scalar_one_or_none()
-    if not diag:
-        raise HTTPException(404, "Diagnosis not found")
-    return diag
-
-
-@router.get("/stats", tags=["Diagnosis"])
+# ⚠️ /stats PHẢI đứng trước /{diagnosis_id} — FastAPI match theo thứ tự khai báo
+@router.get("/stats")
 async def inference_stats(db: AsyncSession = Depends(get_db)):
     """
     Thống kê inference time thực tế trên server (Railway deployment).
@@ -192,7 +176,6 @@ async def inference_stats(db: AsyncSession = Depends(get_db)):
         idx = min(int(p / 100 * n), n - 1)
         return round(times[idx], 2)
 
-    # Phân phối theo class
     from collections import defaultdict
     class_times: dict = defaultdict(list)
     for r in rows:
@@ -200,18 +183,13 @@ async def inference_stats(db: AsyncSession = Depends(get_db)):
             class_times[r.predicted_class].append(r.inference_ms)
 
     per_class = {
-        cls: {
-            "count": len(ts),
-            "avg_ms": round(sum(ts) / len(ts), 2),
-        }
+        cls: {"count": len(ts), "avg_ms": round(sum(ts) / len(ts), 2)}
         for cls, ts in sorted(class_times.items())
     }
 
-    model_versions = list({r.model_version for r in rows if r.model_version})
-
     return {
         "deployment":     "Railway Cloud (CPU)",
-        "model_versions": model_versions,
+        "model_versions": list({r.model_version for r in rows if r.model_version}),
         "total_samples":  n,
         "inference_ms": {
             "avg": round(sum(times) / n, 2),
@@ -224,6 +202,23 @@ async def inference_stats(db: AsyncSession = Depends(get_db)):
         "per_class": per_class,
         "note": "Measured server-side using time.perf_counter() — excludes network latency",
     }
+
+
+@router.get("/{diagnosis_id}", response_model=DiagnosisOut)
+async def get_diagnosis(
+    diagnosis_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Diagnosis)
+        .options(selectinload(Diagnosis.disease).selectinload(DiseaseClass.steps))
+        .where(Diagnosis.id == diagnosis_id, Diagnosis.user_id == current_user.id)
+    )
+    diag = result.scalar_one_or_none()
+    if not diag:
+        raise HTTPException(404, "Diagnosis not found")
+    return diag
 
 
 @router.post("/{diagnosis_id}/feedback", response_model=FeedbackOut, status_code=201)
